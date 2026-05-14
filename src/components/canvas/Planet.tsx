@@ -27,7 +27,6 @@ export function Planet({ config }: PlanetProps) {
     ringTextureUrl,
   } = config; 
 
-  // 1. 加载行星本体贴图
   const texture = useMemo(() => {
     if (!textureUrl) return null;
     const tex = new THREE.TextureLoader().load(textureUrl);
@@ -35,7 +34,6 @@ export function Planet({ config }: PlanetProps) {
     return tex;
   }, [textureUrl]);
 
-  // 2. 加载官方细长条星环贴图 (不需要任何旋转)
   const ringTexture = useMemo(() => {
     if (!ringTextureUrl) return null;
     const tex = new THREE.TextureLoader().load(ringTextureUrl);
@@ -43,7 +41,6 @@ export function Planet({ config }: PlanetProps) {
     return tex;
   }, [ringTextureUrl]);
 
-  // ✨ 终极绝杀：手动生成 RingGeometry，使用“对角线 UV 映射法”
   const ringGeometry = useMemo(() => {
     if (!hasRing || !ringInnerRadius || !ringOuterRadius) return null;
     
@@ -59,10 +56,8 @@ export function Planet({ config }: PlanetProps) {
       const y = pos.getY(i);
       const radius = Math.sqrt(x * x + y * y);
       
-      // 将半径转换为 0 到 1 的进度
       const progress = (radius - inner) / (outer - inner);
       
-      // ⚠️ 对角线映射法：无论图片是横长条还是竖长条，都能完美沿半径铺满！
       uv.setXY(i, progress, progress); 
     }
     
@@ -95,23 +90,31 @@ export function Planet({ config }: PlanetProps) {
 
   const handleClick = useCallback((e: { stopPropagation: () => void }) => {
     e.stopPropagation();
-    if (label) {
-      setFocusedPlanet(config);
-    }
-  }, [label, config, setFocusedPlanet]);
+    setFocusedPlanet(config);
+  }, [config, setFocusedPlanet]);
 
   return (
     <group>
       <Line points={orbitPoints} color="#ffffff" lineWidth={1} transparent opacity={0.15} />
 
-      <group ref={groupRef}>
+      <group ref={groupRef} name={config.name}>
         <Sphere
           ref={planetRef}
-          args={[size, 32, 32]}
-          onPointerOver={(e) => { e.stopPropagation(); if (label) { setHovered(true); document.body.style.cursor = "pointer"; } }}
-          onPointerOut={(e) => { e.stopPropagation(); if (label) { setHovered(false); document.body.style.cursor = "auto"; } }}
+          args={[size, 32, 32]} // ✨ 性能优化：降面数
+          onPointerOver={(e) => { 
+            e.stopPropagation(); 
+            // ✨ 逻辑修改：移除 if (label)，让所有行星都能触发 hover
+            setHovered(true); 
+            document.body.style.cursor = "pointer"; 
+          }}
+          onPointerOut={(e) => { 
+            e.stopPropagation(); 
+            // ✨ 逻辑修改：同上
+            setHovered(false); 
+            document.body.style.cursor = "auto"; 
+          }}
           onClick={handleClick}
-          scale={hovered ? 1.1 : 1}
+          scale={hovered ? 1.05 : 1} // hover 时的轻微放大效果
         >
           <meshStandardMaterial 
             map={texture} 
@@ -121,15 +124,14 @@ export function Planet({ config }: PlanetProps) {
           />
         </Sphere>
 
-        {/* ✨ 星环渲染：直接读取 RGBA 原色和原透明度 */}
         {ringGeometry && (
           <mesh rotation={[Math.PI / 2.5, 0, 0]} geometry={ringGeometry}>
             {ringTexture ? (
               <meshBasicMaterial
-                map={ringTexture}          // ✨ 直接用 map
-                color="#ffffff"            // ✨ 纯白底色，完美还原土星黄
+                map={ringTexture}          
+                color="#ffffff"            
                 side={THREE.DoubleSide}
-                transparent={true}         // ✨ 激活贴图自带的 Alpha 镂空
+                transparent={true}         
                 opacity={0.9} 
                 depthWrite={false} 
               />
@@ -139,6 +141,7 @@ export function Planet({ config }: PlanetProps) {
           </mesh>
         )}
 
+        {/* 注意：这里的 if (label) 保留了，没有 label 就不渲染浮空文字 */}
         {label && hovered && (
           <Html position={[0, size * 1.8, 0]} center distanceFactor={10}>
             <div className="pointer-events-none whitespace-nowrap rounded bg-black/70 px-2 py-1 text-xs font-medium tracking-wide text-white backdrop-blur-sm">

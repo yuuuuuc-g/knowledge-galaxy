@@ -48,7 +48,7 @@ export function EarthMoonSystem({ config }: PlanetProps) {
   });
 
   return (
-    <group ref={systemGroupRef}>
+    <group ref={systemGroupRef} name={config.name}>
       {/* 
         🌍 地球本体 
         我们将 orbitRadius 设为 0，因为父群组已经在处理位移了。
@@ -66,7 +66,7 @@ export function EarthMoonSystem({ config }: PlanetProps) {
         moonPivotRef 位于地球中心 (0,0,0)
       */}
       <group ref={moonPivotRef}>
-        <mesh ref={moonRef} position={[size * 2.5, 0, 0]}>
+        <mesh ref={moonRef} position={[size * 2.0, 0, 0]}>
           {/* 月球大小通常是地球的 1/4 左右 */}
           <sphereGeometry args={[size * 0.25, 32, 32]} />
           <meshStandardMaterial 

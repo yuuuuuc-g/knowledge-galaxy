@@ -15,7 +15,7 @@ export default function Home() {
   return (
     <main className="relative h-screen w-screen bg-black">
       <div className="pointer-events-none absolute inset-0 z-10 flex flex-col p-8 text-white">
-        <h1 className="font-serif text-2xl tracking-widest text-white/50">EXOCORTEX CORE</h1>
+        <h1 className="font-serif text-2xl tracking-widest text-white/50">A SPACE</h1>
         <p className="mt-2 text-xs tracking-wider text-white/30">
           {focusedPlanet ? "Click Back to Galaxy to return" : "Drag to rotate • Scroll to zoom • Click planet to focus"}
         </p>
@@ -55,7 +55,7 @@ export default function Home() {
         <Stars
           radius={50}
           depth={50}
-          count={1000}
+          count={100}
           factor={4}
           saturation={0}
           fade
