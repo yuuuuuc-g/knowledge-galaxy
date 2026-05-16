@@ -5,7 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useSolarStore } from "@/src/store/solarStore";
 
-const INITIAL_CAMERA_POSITION = new THREE.Vector3(0, 8, 25);
+const INITIAL_CAMERA_POSITION = new THREE.Vector3(0, 8, 40);
 const LERP_SPEED = 3.5;
 
 export function CameraController() {

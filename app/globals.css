@@ -13,3 +13,42 @@ html, body, #__next {
   overflow: hidden; /* 宇宙没有边界，不需要滚动条 */
   background-color: #000000; /* 默认深空黑 */
 }
+
+.refinery-editor .ProseMirror h1,
+.refinery-editor .ProseMirror h2,
+.refinery-editor .ProseMirror h3 {
+  color: #deff9a;
+  font-family: var(--font-geist-mono), monospace;
+  letter-spacing: 0.08em;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.refinery-editor .ProseMirror p {
+  margin: 0.75rem 0;
+}
+
+.refinery-editor .ProseMirror strong {
+  color: #ffffff;
+}
+
+.refinery-editor .ProseMirror code {
+  color: #deff9a;
+  background: rgba(222, 255, 154, 0.08);
+  border: 1px solid rgba(222, 255, 154, 0.16);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+}
+
+.refinery-editor .ProseMirror ul,
+.refinery-editor .ProseMirror ol {
+  padding-left: 1.25rem;
+  margin: 0.75rem 0;
+}
+
+.refinery-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgba(255, 255, 255, 0.3);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Line } from "@react-three/drei"; // ✨ 新增：引入 Line 重新画出地球轨道
+import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { Planet } from "./Planet";
 import type { PlanetProps } from "./types";
@@ -20,50 +20,55 @@ export function EarthMoonSystem({ config }: PlanetProps) {
     return tex;
   }, []);
 
-  // 地球系统绕太阳的初始随机角度
-  const angleRef = useRef(Math.random() * Math.PI * 2);
-  
-  // ✨ 新增：给月亮准备专属的独立角度计算器
-  const moonAngleRef = useRef(Math.random() * Math.PI * 2);
+  // ✨ 1. 核心物理参数计算：引入偏心率
+  const eccentricity = config.eccentricity || 0;
+  const a = orbitRadius;                                      // 长半轴
+  const b = a * Math.sqrt(1 - eccentricity * eccentricity);    // 短半轴
+  const focalShift = a * eccentricity;                        // 焦点偏移
 
-  // ✨ 修复：重新计算并补回地球丢失的白色公转轨道线
+// ✅ 完美的惰性初始化新代码
+const [initialAngle] = useState(() => Math.random() * Math.PI * 2);
+const angleRef = useRef(initialAngle);
+
+// (在地月系统中，月球的也一样改)
+const [initialMoonAngle] = useState(() => Math.random() * Math.PI * 2);
+const moonAngleRef = useRef(initialMoonAngle);
+
+  // ✨ 2. 修改轨道线：画出椭圆轨迹
   const orbitPoints = useMemo(() => {
     const points: THREE.Vector3[] = [];
     const segments = 128;
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius));
+      // 使用椭圆参数方程
+      points.push(new THREE.Vector3(Math.cos(angle) * a - focalShift, 0, Math.sin(angle) * b));
     }
     return points;
-  }, [orbitRadius]);
+  }, [a, b, focalShift]);
 
   useFrame((_, delta) => {
-    // 1. 处理大公转 (地球系统整体绕太阳飞行)
+    // ✨ 3. 修改大公转逻辑：让地月系统整体沿椭圆飞行
     angleRef.current += delta * orbitSpeed * 0.1;
     if (systemGroupRef.current) {
-      systemGroupRef.current.position.x = Math.cos(angleRef.current) * orbitRadius;
-      systemGroupRef.current.position.z = Math.sin(angleRef.current) * orbitRadius;
+      systemGroupRef.current.position.x = Math.cos(angleRef.current) * a - focalShift;
+      systemGroupRef.current.position.z = Math.sin(angleRef.current) * b;
     }
 
-    // ✨ 2. 终极修复：用绝对的数学三角函数算月球的公转，告别嵌套 Bug
+    // 处理月球的小公转 (绕地飞行保持正圆，因为地月偏心率极小，视觉不明显)
     if (moonRef.current) {
-      // 推进月球公转角度
       moonAngleRef.current += delta * 0.8; 
-      // 设定地月距离
       const moonDistance = size * 2.5; 
       
-      // 直接计算并赋值月球在 X 轴和 Z 轴的绝对位置
       moonRef.current.position.x = Math.cos(moonAngleRef.current) * moonDistance;
       moonRef.current.position.z = Math.sin(moonAngleRef.current) * moonDistance;
       
-      // 3. 处理月球自转
       moonRef.current.rotation.y += delta * 0.2;
     }
   });
 
   return (
     <group>
-      {/* 画出地球绕日轨道线 */}
+      {/* 补回基于椭圆算法的地球轨道线 */}
       <Line points={orbitPoints} color="#ffffff" lineWidth={1} transparent opacity={0.15} />
 
       <group ref={systemGroupRef} name={config.name}>
@@ -71,14 +76,11 @@ export function EarthMoonSystem({ config }: PlanetProps) {
           config={{
             ...config,
             orbitRadius: 0, 
+            eccentricity: 0, // 强制子组件内部不再计算偏移
           }} 
         />
         
-        {/* ✨ 现在的月亮不再依赖轴心 Group，
-          而是直接挂载，靠上面的 useFrame 物理计算每秒刷新位置！
-        */}
         <mesh ref={moonRef}>
-          {/* 面数同步优化为 24，确保流畅度 */}
           <sphereGeometry args={[size * 0.25, 24, 24]} />
           <meshStandardMaterial 
             map={moonTexture} 

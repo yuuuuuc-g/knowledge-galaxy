@@ -1,15 +1,28 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useSolarStore } from "@/src/store/solarStore";
+import { CyberButton } from "@/src/components/ui/CyberButton";
+import { GlassPanel } from "@/src/components/ui/GlassPanel";
 
 export function NodeDetailPanel() {
+  const router = useRouter();
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
 
   if (!focusedPlanet) return null;
 
+  const handleEnterSystem = () => {
+    if (focusedPlanet.label === "Obsidian Vault") {
+      router.push("/refinery");
+      return;
+    }
+
+    alert(`Entering ${focusedPlanet.label}...`);
+  };
+
   return (
-    <div className="pointer-events-auto absolute right-0 top-0 z-20 flex h-full w-80 flex-col border-l border-white/10 bg-black/80 p-6 text-white backdrop-blur-md">
+    <GlassPanel className="pointer-events-auto absolute right-0 top-0 z-20 flex h-full w-80 flex-col border-y-0 border-r-0 p-6">
       
       {/* ============ 顶部标题与标签 ============ */}
       <div className="mb-8">
@@ -77,21 +90,22 @@ export function NodeDetailPanel() {
       <div className="mt-auto pt-6">
         {/* 如果这个行星接入了业务功能，显示一个醒目的进入按钮 */}
         {focusedPlanet.label && (
-          <button
-            className="mb-3 w-full rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-4 py-3 text-sm font-bold tracking-widest text-[#deff9a] transition-all hover:bg-[#deff9a]/20"
-            onClick={() => alert(`Entering ${focusedPlanet.label}...`)}
+          <CyberButton
+            className="mb-3 w-full"
+            onClick={handleEnterSystem}
           >
             ENTER SYSTEM
-          </button>
+          </CyberButton>
         )}
 
-        <button
+        <CyberButton
+          variant="secondary"
           onClick={() => setFocusedPlanet(null)}
-          className="w-full rounded border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium tracking-wide transition-colors hover:bg-white/10"
+          className="w-full"
         >
           BACK TO GALAXY
-        </button>
+        </CyberButton>
       </div>
-    </div>
+    </GlassPanel>
   );
 }

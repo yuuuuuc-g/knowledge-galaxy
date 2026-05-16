@@ -23,7 +23,7 @@ export default function Home() {
 
       <Canvas
   className="z-0"
-  camera={{ position: [0, 8, 25], fov: 45 }}
+  camera={{ position: [0, 8, 40], fov: 45 }}
   dpr={[1, 1.5]} // ✨ 新增：限制像素倍率，防卡顿神器！
 >
         {/* ✨ 核心升级：挂载银河系全景背景 */}
@@ -44,7 +44,7 @@ export default function Home() {
           <OrbitControls
             enablePan={false}
             minDistance={5}
-            maxDistance={30}
+            maxDistance={100}
           />
         )}
 

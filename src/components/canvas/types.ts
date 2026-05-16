@@ -18,6 +18,8 @@ export interface PlanetConfig {
   mass?: string;
   gravity?: string;
   type?: string; // 类地行星、气态巨行星等
+  // ✨ 新增：轨道偏心率 (0 是正圆，接近 1 则是极扁的椭圆)
+  eccentricity?: number;
 }
 
 export interface PlanetProps {
