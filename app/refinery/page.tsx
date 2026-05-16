@@ -260,21 +260,6 @@ export default function RefineryPage() {
   const [selectedItems, setSelectedItems] =
     useState<SelectedItemsByPhase>(emptySelectedItems);
   const [pendingPhase, setPendingPhase] = useState<RefineryPhase | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-
-  const handleEnterEdit = useCallback(() => {
-    setIsEditing(true);
-  }, []);
-
-  const handleSaveDraft = useCallback((html: string) => {
-    setDraftD(html);
-    setIsEditing(false);
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
-    setIsEditing(false);
-  }, []);
-
   const {
     complete,
     completion,
@@ -285,6 +270,23 @@ export default function RefineryPage() {
     api: "/api/refinery",
     streamProtocol: "text",
   });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editInitialContent, setEditInitialContent] = useState("");
+
+  const handleEnterEdit = useCallback(() => {
+    setEditInitialContent(draftD || completion);
+    setIsEditing(true);
+  }, [draftD, completion]);
+
+  const handleSaveDraft = useCallback((html: string) => {
+    setDraftD(html);
+    setIsEditing(false);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
 
   const leftArchiveText =
     phase === "D"
@@ -680,7 +682,7 @@ export default function RefineryPage() {
               {phase === "D" ? (
                 isEditing ? (
                   <RefineryTipTapDraft
-                    initialContent={draftD || completion}
+                    initialContent={editInitialContent}
                     onSave={handleSaveDraft}
                     onCancel={handleCancelEdit}
                   />
