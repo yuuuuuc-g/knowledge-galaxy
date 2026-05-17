@@ -39,12 +39,13 @@ const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.5,
     rotationSpeed: 1.0,
     color: "#4f86f7",
-    label: "Knowledge Graph",
-    textureUrl: "/textures/2k_earth_daymap.jpg", 
+    label: "Archive",
+    module: "archive",
+    textureUrl: "/textures/2k_earth_daymap.jpg",
     type: "Terrestrial Planet",
     gravity: "9.80 m/s²",
     mass: "5.97 × 10²⁴ kg",
-    description: "The third planet from the Sun and the only known celestial body to harbor life, featuring vast oceans of liquid water and a protective nitrogen-oxygen atmosphere."
+    description: "The central document repository where all generated knowledge is aggregated, organized, and made browsable."
   },
   {
     name: "Mars",
@@ -53,12 +54,13 @@ const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.4,
     rotationSpeed: 0.9,
     color: "#c1440e",
-    label: "Obsidian Vault",
+    label: "Analytical Pipeline",
+    module: "analytical-pipeline",
     textureUrl: "/textures/2k_mars.jpg",
     type: "Terrestrial Planet",
     gravity: "3.71 m/s²",
     mass: "6.42 × 10²³ kg",
-    description: "The Red Planet is a dusty, cold, desert world with a very thin atmosphere, featuring extinct volcanoes and massive canyon systems."
+    description: "The analytical engine for deep cognitive refinement. Enter to decompose events, extract atomic facts, and synthesize structured analysis through a rigorous A→B→C→D workflow."
   },
   {
     name: "Jupiter",
@@ -70,7 +72,8 @@ const PLANETS: PlanetConfig[] = [
     hasRing: true,
     ringInnerRadius: 1.4,
     ringOuterRadius: 2.2,
-    label: "Spatial Canvas",
+    label: "Knowledge Graph",
+    module: "knowledge-graph",
     textureUrl: "/textures/2k_jupiter.jpg",
     ringTextureUrl: "/textures/2k_jupiter_ring_alpha.png", 
     type: "Gas Giant",

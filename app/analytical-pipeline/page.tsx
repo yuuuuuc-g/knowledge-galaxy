@@ -6,11 +6,12 @@ import { useCompletion } from "@ai-sdk/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles, Database, Sun, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
+import { createClient } from "@/src/lib/supabase/client";
 
 type RefineryPhase = "A" | "B" | "C" | "D";
 
@@ -267,12 +268,13 @@ export default function RefineryPage() {
     error: completionError,
     setCompletion,
   } = useCompletion({
-    api: "/api/refinery",
+    api: "/api/analytical-pipeline",
     streamProtocol: "text",
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [editInitialContent, setEditInitialContent] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const handleEnterEdit = useCallback(() => {
     setEditInitialContent(draftD || completion);
@@ -287,6 +289,54 @@ export default function RefineryPage() {
   const handleCancelEdit = useCallback(() => {
     setIsEditing(false);
   }, []);
+
+  const handlePersistToDatabase = useCallback(async () => {
+    const content = draftD || completion;
+    if (!content.trim()) return;
+
+    setSaveStatus("saving");
+
+    const supabase = createClient();
+
+    try {
+      const { data: document, error: docError } = await supabase
+        .from("documents")
+        .insert({
+          title: sourceText.slice(0, 50) || "Untitled Analysis",
+          content_markdown: content,
+          source_module: "analytical-pipeline",
+        })
+        .select()
+        .single();
+
+      if (docError || !document) {
+        setSaveStatus("error");
+        return;
+      }
+
+      const { error: sessionError } = await supabase
+        .from("analytical_sessions")
+        .insert({
+          document_id: document.id,
+          source_issue: sourceText,
+          phases: {
+            a: { archive: archives.A, selected_items: selectedItems.A },
+            b: { archive: archives.B, selected_items: selectedItems.B },
+            c: { archive: archives.C, selected_items: selectedItems.C },
+          },
+        });
+
+      if (sessionError) {
+        setSaveStatus("error");
+        return;
+      }
+
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [draftD, completion, sourceText, archives, selectedItems]);
 
   const leftArchiveText =
     phase === "D"
@@ -665,15 +715,58 @@ export default function RefineryPage() {
                   </p>
                 </div>
                 {phase === "D" && !isEditing && !streamingD && (
-                  <button
-                    type="button"
-                    onClick={handleEnterEdit}
-                    className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
-                    title="进入编辑模式"
-                  >
-                    <FileEdit size={14} aria-hidden="true" />
-                    <span className="hidden sm:inline">编辑文档</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {saveStatus === "saved" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/")}
+                          className="flex items-center gap-2 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-xs text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20"
+                          title="返回太阳主控台"
+                        >
+                          <Sun size={14} aria-hidden="true" />
+                          <span className="hidden sm:inline">Back to Sun</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetFlow}
+                          className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                          title="开启新分析"
+                        >
+                          <RotateCcw size={14} aria-hidden="true" />
+                          <span className="hidden sm:inline">New Session</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handlePersistToDatabase}
+                          disabled={saveStatus === "saving"}
+                          className={`flex items-center gap-2 rounded border px-3 py-2 text-xs transition ${
+                            saveStatus === "error"
+                              ? "border-red-500/30 bg-red-500/10 text-red-400"
+                              : "border-white/10 bg-white/[0.04] text-white/60 hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                          }`}
+                          title="保存到数据库"
+                        >
+                          <Database size={14} aria-hidden="true" />
+                          <span className="hidden sm:inline">
+                            {saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Retry" : "Save to Archive"}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleEnterEdit}
+                          className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                          title="进入编辑模式"
+                        >
+                          <FileEdit size={14} aria-hidden="true" />
+                          <span className="hidden sm:inline">编辑文档</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </header>

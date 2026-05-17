@@ -8,6 +8,7 @@ import { CoreStar } from "@/src/components/canvas/CoreStar";
 import { SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
+import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
 import { useSolarStore } from "@/src/store/solarStore";
 
 function WebGLWarning() {
@@ -24,6 +25,7 @@ function WebGLWarning() {
 export default function Home() {
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
 
   const handleContextLost = useCallback((event: Event) => {
     event.preventDefault();
@@ -85,13 +87,12 @@ export default function Home() {
           color="#ffffff"
         />
 
-        {!focusedPlanet && (
-          <OrbitControls
-            enablePan={false}
-            minDistance={5}
-            maxDistance={100}
-          />
-        )}
+        <OrbitControls
+          enablePan={false}
+          minDistance={5}
+          maxDistance={100}
+          enabled={!focusedPlanet}
+        />
 
         {/* 保留原有的 Stars 组件。
           银河贴图作为远景背景，点状的 Stars 作为近景悬浮物。
@@ -112,7 +113,11 @@ export default function Home() {
         <SolarSystem />
       </Canvas>
 
-      <NodeDetailPanel />
+      <NodeDetailPanel onEnterArchive={() => setShowArchive(true)} />
+
+      {showArchive && (
+        <ArchivePanel onClose={() => setShowArchive(false)} />
+      )}
     </main>
   );
 }

@@ -24,8 +24,6 @@ export function CameraController() {
   }, [focusedPlanet]);
 
   useFrame((_, delta) => {
-    // ✨ 核心修复：如果没有在运镜，且当前没有聚焦行星，直接休眠！
-    // 这就把摄像机的控制权彻底交还给了用户的鼠标 (OrbitControls)
     if (!isTransitioning.current && !focusedPlanet) return;
 
     if (focusedPlanet) {
@@ -48,20 +46,17 @@ export function CameraController() {
         targetLookAt.current.copy(planetWorldPos);
       }
     } else {
-      // 退回全局视角
       targetPosition.current.copy(INITIAL_CAMERA_POSITION);
       targetLookAt.current.set(0, 0, 0);
     }
 
-    // ============ 执行丝滑的镜头插值运算 ============
     camera.position.lerp(targetPosition.current, delta * LERP_SPEED);
     
     const currentLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
     currentLookAt.lerp(targetLookAt.current, delta * LERP_SPEED);
     camera.lookAt(currentLookAt);
 
-    // ✨ 核心修复：如果摄像机已经非常接近目标点了，关闭运镜锁，释放控制权
-    if (camera.position.distanceTo(targetPosition.current) < 0.1) {
+    if (camera.position.distanceTo(targetPosition.current) < 0.05) {
       isTransitioning.current = false;
     }
   });
