@@ -18,36 +18,34 @@ export function CameraController() {
   // ✨ 新增：运镜状态锁
   const isTransitioning = useRef(false);
 
-  // ✨ 监听焦点变化：不管是聚焦行星，还是退回全局，只要状态变了，就开启运镜锁
+  // Only claim camera control while focusing a planet. Once focus is cleared,
+  // OrbitControls owns the camera fully and user drag state must be preserved.
   useEffect(() => {
-    isTransitioning.current = true;
+    isTransitioning.current = focusedPlanet !== null;
   }, [focusedPlanet]);
 
   useFrame((_, delta) => {
-    if (!isTransitioning.current && !focusedPlanet) return;
+    if (!focusedPlanet) {
+      return;
+    }
 
-    if (focusedPlanet) {
-      const planetObj = scene.getObjectByName(focusedPlanet.name);
-      
-      if (planetObj) {
-        const planetWorldPos = new THREE.Vector3();
-        planetObj.getWorldPosition(planetWorldPos);
+    const planetObj = scene.getObjectByName(focusedPlanet.name);
 
-        const directionFromSun = planetWorldPos.clone().normalize();
-        
-        const distance = focusedPlanet.size * 6;
-        const height = focusedPlanet.size * 2.5;
+    if (planetObj) {
+      const planetWorldPos = new THREE.Vector3();
+      planetObj.getWorldPosition(planetWorldPos);
 
-        targetPosition.current
-          .copy(planetWorldPos)
-          .add(directionFromSun.multiplyScalar(distance))
-          .add(new THREE.Vector3(0, height, 0));
+      const directionFromSun = planetWorldPos.clone().normalize();
 
-        targetLookAt.current.copy(planetWorldPos);
-      }
-    } else {
-      targetPosition.current.copy(INITIAL_CAMERA_POSITION);
-      targetLookAt.current.set(0, 0, 0);
+      const distance = focusedPlanet.size * 6;
+      const height = focusedPlanet.size * 2.5;
+
+      targetPosition.current
+        .copy(planetWorldPos)
+        .add(directionFromSun.multiplyScalar(distance))
+        .add(new THREE.Vector3(0, height, 0));
+
+      targetLookAt.current.copy(planetWorldPos);
     }
 
     camera.position.lerp(targetPosition.current, delta * LERP_SPEED);

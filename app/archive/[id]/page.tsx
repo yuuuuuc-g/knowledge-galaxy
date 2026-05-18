@@ -70,6 +70,13 @@ export default async function ArchivePage({ params }: ArchivePageProps) {
             <ArrowLeft size={16} />
             <span>Back to Sun</span>
           </Link>
+          <Link
+            href="/knowledge-graph"
+            className="flex items-center gap-2 text-sm text-white/60 transition hover:text-[#deff9a]"
+          >
+            <Tag size={16} />
+            <span>Return to The Nexus</span>
+          </Link>
           <span className="text-xs text-white/40">
             {new Date(document.created_at).toLocaleDateString()}
           </span>

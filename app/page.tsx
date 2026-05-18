@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 // ✨ 引入 Environment 组件
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
@@ -26,6 +26,7 @@ export default function Home() {
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
+  const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
 
   const handleContextLost = useCallback((event: Event) => {
     event.preventDefault();
@@ -92,6 +93,7 @@ export default function Home() {
           minDistance={5}
           maxDistance={100}
           enabled={!focusedPlanet}
+          target={orbitTarget}
         />
 
         {/* 保留原有的 Stars 组件。

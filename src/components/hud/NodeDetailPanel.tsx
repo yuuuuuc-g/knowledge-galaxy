@@ -25,7 +25,7 @@ export function NodeDetailPanel({ onEnterArchive }: NodeDetailPanelProps) {
         onEnterArchive();
         break;
       case "knowledge-graph":
-        alert("Knowledge Graph module coming soon...");
+        router.push("/knowledge-graph");
         break;
       default:
         alert(`Entering ${focusedPlanet.label}...`);
