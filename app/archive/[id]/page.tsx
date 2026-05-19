@@ -136,15 +136,7 @@ export default async function ArchivePage({ params }: ArchivePageProps) {
               </>
             )}
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-5">
-              <Link
-                href="/"
-                className="flex items-center gap-2 text-sm text-white/60 transition hover:text-[#deff9a]"
-              >
-                <ArrowLeft size={16} />
-                <span>Back to Sun</span>
-              </Link>
-            </div>
+            
           </aside>
         </div>
       </main>

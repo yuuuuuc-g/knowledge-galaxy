@@ -9,12 +9,36 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      topics: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       documents: {
         Row: {
           id: string;
           title: string;
           content_markdown: string;
           source_module: string;
+          topic_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -23,6 +47,7 @@ export interface Database {
           title: string;
           content_markdown: string;
           source_module: string;
+          topic_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -31,6 +56,7 @@ export interface Database {
           title?: string;
           content_markdown?: string;
           source_module?: string;
+          topic_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

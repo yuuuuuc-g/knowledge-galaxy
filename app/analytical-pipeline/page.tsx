@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCompletion } from "@ai-sdk/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles, Database, Sun, RotateCcw, X, Plus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles, Database, Sun, RotateCcw, X, Plus, BookOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
@@ -20,6 +20,12 @@ type PhaseSelections = Record<RefineryPhase, string[]>;
 
 /** Full [选项开始]…[选项结束] inner text per option key, e.g. "A:0" -> "标题：…\n…" */
 type SelectedItemsByPhase = Record<"A" | "B" | "C", Record<string, string>>;
+
+interface Topic {
+  id: string;
+  title: string;
+  description: string | null;
+}
 
 const phaseOrder: RefineryPhase[] = ["A", "B", "C", "D"];
 
@@ -306,10 +312,52 @@ export default function RefineryPage() {
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [topicsLoading, setTopicsLoading] = useState(true);
+
   const handleEnterEdit = useCallback(() => {
     setEditInitialContent(draftD || completion);
     setIsEditing(true);
   }, [draftD, completion]);
+
+  useEffect(() => {
+    async function fetchTopics() {
+      console.log("[Topics] Starting to load topics...");
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("topics")
+          .select("id, title, description")
+          .order("updated_at", { ascending: false });
+
+        if (error) {
+          console.error("[Topics] Failed to load topics:", error);
+          console.error("[Topics] 加载议题失败详情:", {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          });
+          return;
+        }
+
+        if (data) {
+          console.log("[Topics] Successfully loaded topics:", data.length, data);
+          setTopics(data);
+        } else {
+          console.warn("[Topics] No data returned from topics query");
+          setTopics([]);
+        }
+      } catch (error) {
+        console.error("[Topics] Unexpected error while loading topics:", error);
+      } finally {
+        setTopicsLoading(false);
+      }
+    }
+
+    fetchTopics();
+  }, []);
 
   const phaseHasVisibleWorkbenchOutput =
     phase !== "D" &&
@@ -328,29 +376,157 @@ export default function RefineryPage() {
     setIsEditing(false);
   }, []);
 
-  const handlePersistToDatabase = useCallback(async () => {
-    const content = draftD || completion;
-    if (!content.trim()) return;
+  const [, setSaveError] = useState<string | null>(null);
 
+  const handlePersistToDatabase = useCallback(async () => {
+    const content = (draftD || completion).trim();
+    if (!content) {
+      console.warn("[Persist] Content is empty, aborting save.");
+      return;
+    }
+
+    console.log("[Persist] Starting save. selectedTopicId:", selectedTopicId);
     setSaveStatus("saving");
+    setSaveError(null);
 
     const supabase = createClient();
+    const failPersist = (message: string, error?: { message?: string; code?: string; details?: string; hint?: string }) => {
+      if (error) {
+        console.error("写入失败详情:", error);
+        console.error("[Persist] Error details:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+      } else {
+        console.error("[Persist]", message);
+      }
+
+      setSaveStatus("error");
+      setSaveError(error?.message ? `${message}: ${error.message}` : message);
+    };
 
     try {
+      if (selectedTopicId) {
+        console.log("[Persist] APPEND MODE — selectedTopicId:", selectedTopicId);
+        const { data: existingDoc, error: fetchError } = await supabase
+          .from("documents")
+          .select("id, content_markdown")
+          .eq("topic_id", selectedTopicId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fetchError) {
+          failPersist("Fetch document failed", fetchError);
+          return;
+        }
+
+        if (!existingDoc) {
+          failPersist(`No existing document found for topic_id ${selectedTopicId}.`);
+          return;
+        }
+
+        console.log("[Persist] Existing document found:", existingDoc.id);
+        console.log("[Persist] Existing content length:", existingDoc.content_markdown?.length ?? 0);
+        console.log("[Persist] New content length:", content.length);
+
+        const updatedContent = `${existingDoc.content_markdown}\n\n---\n\n${content}`;
+        console.log("[Persist] Combined content length:", updatedContent.length);
+
+        const { error: updateError } = await supabase
+          .from("documents")
+          .update({ content_markdown: updatedContent })
+          .eq("id", existingDoc.id)
+          .eq("topic_id", selectedTopicId)
+          .select("id")
+          .single();
+
+        if (updateError) {
+          failPersist("Update document failed", updateError);
+          return;
+        }
+
+        console.log("[Persist] Document updated successfully. Inserting analytical_session...");
+
+        const { error: sessionError } = await supabase
+          .from("analytical_sessions")
+          .insert({
+            document_id: existingDoc.id,
+            source_issue: sourceText,
+            phases: {
+              a: { archive: archives.A, selected_items: selectedItems.A },
+              b: { archive: archives.B, selected_items: selectedItems.B },
+              c: { archive: archives.C, selected_items: selectedItems.C, custom_tags: customTags },
+            },
+          });
+
+        if (sessionError) {
+          failPersist("Insert session failed", sessionError);
+          return;
+        }
+
+        console.log("[Persist] APPEND MODE complete.");
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+        return;
+      }
+
+      console.log("[Persist] NEW TOPIC MODE");
+      let topicId: string | null = selectedTopicId;
+
+      if (!topicId) {
+        const topicTitle = sourceText.trim().slice(0, 100) || "Untitled Topic";
+        console.log("[Persist] Inserting new topic...");
+        const { data: newTopic, error: topicError } = await supabase
+          .from("topics")
+          .insert({
+            title: topicTitle,
+            description: null,
+          })
+          .select()
+          .single();
+
+        if (topicError) {
+          failPersist("Insert topic failed", topicError);
+          return;
+        }
+
+        if (!newTopic) {
+          failPersist("No topic returned after insert.");
+          return;
+        }
+
+        console.log("[Persist] New topic created:", newTopic.id);
+        topicId = newTopic.id;
+        setTopics((prev) => [newTopic, ...prev]);
+      }
+
+      console.log("[Persist] Inserting new document with topic_id:", topicId);
       const { data: document, error: docError } = await supabase
         .from("documents")
         .insert({
           title: sourceText.slice(0, 50) || "Untitled Analysis",
           content_markdown: content,
           source_module: "analytical-pipeline",
+          topic_id: topicId,
         })
         .select()
         .single();
 
-      if (docError || !document) {
-        setSaveStatus("error");
+      if (docError) {
+        failPersist("Insert document failed", docError);
         return;
       }
+
+      if (!document) {
+        failPersist("No document returned after insert.");
+        return;
+      }
+
+      console.log("[Persist] New document created:", document.id);
+      console.log("[Persist] Inserting analytical_session...");
 
       const { error: sessionError } = await supabase
         .from("analytical_sessions")
@@ -365,16 +541,19 @@ export default function RefineryPage() {
         });
 
       if (sessionError) {
-        setSaveStatus("error");
+        failPersist("Insert session failed", sessionError);
         return;
       }
 
+      console.log("[Persist] NEW TOPIC MODE complete.");
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 3000);
-    } catch {
+    } catch (err) {
+      console.error("[Persist] Unexpected error:", err);
       setSaveStatus("error");
+      setSaveError(err instanceof Error ? err.message : "Unknown error occurred");
     }
-  }, [draftD, completion, sourceText, archives, selectedItems, customTags]);
+  }, [draftD, completion, sourceText, archives, selectedItems, customTags, selectedTopicId]);
 
   const leftArchiveText =
     phase === "D"
@@ -461,10 +640,20 @@ export default function RefineryPage() {
     setPendingPhase(targetPhase);
     setCompletion("");
 
+    const requestBody: Record<string, unknown> = {
+      phase: targetPhase,
+    };
+
+    if (targetPhase === "D" && selectedTopicId) {
+      const existingTopic = topics.find((t) => t.id === selectedTopicId);
+      if (existingTopic) {
+        requestBody.selectedTopicId = selectedTopicId;
+        requestBody.topicTitle = existingTopic.title;
+      }
+    }
+
     const result = await complete(prompt, {
-      body: {
-        phase: targetPhase,
-      },
+      body: requestBody,
     });
 
     const finalText = result ?? "";
@@ -501,6 +690,7 @@ export default function RefineryPage() {
     setIsEditing(false);
     setCustomTags([]);
     setTagInput("");
+    setSelectedTopicId(null);
   };
 
   const showAdvance =
@@ -538,7 +728,7 @@ export default function RefineryPage() {
               onClick={() => router.push("/")}
             >
               <ArrowLeft size={16} aria-hidden="true" />
-              BACK TO GALAXY
+              BACK TO MARS
             </CyberButton>
           </div>
         </header>
@@ -583,12 +773,35 @@ export default function RefineryPage() {
                   {phaseMeta[phase].title}
                 </p>
                 {phase === "A" && (
-                  <textarea
-                    value={sourceText}
-                    onChange={(event) => setSourceText(event.target.value)}
-                    placeholder={initialPrompt}
-                    className="mt-3 min-h-32 w-full resize-none rounded border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
-                  />
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2">
+                      <BookOpen size={14} className="text-[#deff9a]/70" />
+                      <select
+                        value={selectedTopicId ?? "CREATE_NEW_TOPIC"}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSelectedTopicId(value === "CREATE_NEW_TOPIC" ? null : value);
+                        }}
+                        disabled={topicsLoading}
+                        className="flex-1 bg-transparent text-sm text-white outline-none"
+                      >
+                        <option value="CREATE_NEW_TOPIC" className="bg-zinc-900 text-white">
+                          + Create New Topic
+                        </option>
+                        {topics.map((topic) => (
+                          <option key={topic.id} value={topic.id} className="bg-zinc-900 text-white">
+                            {topic.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      value={sourceText}
+                      onChange={(event) => setSourceText(event.target.value)}
+                      placeholder={initialPrompt}
+                      className="min-h-32 w-full resize-none rounded border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
+                    />
+                  </div>
                 )}
 
                 {phase !== "A" && (
@@ -700,7 +913,7 @@ export default function RefineryPage() {
             }`}
           >
             {isWorkbenchOpen && (
-              <GlassPanel className="relative flex flex-1 min-h-[70vh] overflow-hidden rounded p-4 sm:p-5">
+              <GlassPanel className="relative flex flex-1 flex-col rounded p-4 sm:p-5 h-auto">
                 <header className="absolute left-0 right-0 top-0 z-10 border-b border-white/10 bg-zinc-950/90 px-4 pb-4 pt-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -765,7 +978,7 @@ export default function RefineryPage() {
                               title="进入编辑模式"
                             >
                               <FileEdit size={14} aria-hidden="true" />
-                              <span className="hidden sm:inline">编辑文档</span>
+                              <span className="hidden sm:inline">Edit Document</span>
                             </button>
                           </>
                         )}
@@ -774,7 +987,7 @@ export default function RefineryPage() {
                   </div>
                 </header>
 
-                <div className="absolute inset-x-0 bottom-0 top-[5.75rem] overflow-y-auto rounded-lg border border-white/5 bg-zinc-900/50">
+                <div className="mt-[4.5rem] rounded-lg border border-white/5 bg-zinc-900/50">
                   {(phase === "A" || phase === "B") && workbenchView === "cards" && (
                     <div className="flex flex-col gap-3 p-4">
                       {optionBlocks.map((block, index) => {
@@ -826,102 +1039,100 @@ export default function RefineryPage() {
                   )}
 
                   {phase === "C" && workbenchView === "tags" && (
-                    <div className="flex flex-col gap-4 p-4">
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-6 p-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {optionBlocks.map((block, index) => {
                           const key = optionKey(phase, index);
                           const checked = selectedKeys.includes(key);
                           const optionText = normalizeOptionText(block);
+                          const rows = parseLabeledLines(optionText);
+
                           return (
-                            <button
+                            <label
                               key={key}
-                              type="button"
-                              onClick={() => toggleSelection(key, optionText)}
-                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                              className={`flex cursor-pointer flex-col gap-2 rounded-xl border p-4 text-left transition ${
                                 checked
-                                  ? "border-[#deff9a]/55 bg-[#deff9a]/10 text-[#deff9a] shadow-[0_0_0_1px_rgba(222,255,154,0.12)]"
-                                  : "border-white/10 bg-zinc-950/50 text-white/60 hover:border-white/25 hover:text-white/80"
+                                  ? "border-[#deff9a]/55 bg-[#deff9a]/10 shadow-[0_0_0_1px_rgba(222,255,154,0.12)]"
+                                  : "border-white/10 bg-zinc-950/50 hover:border-white/25"
                               }`}
                             >
-                              <span className="max-w-[200px] truncate">{optionText.slice(0, 40)}{optionText.length > 40 ? "..." : ""}</span>
-                              {checked && <CheckCircle2 size={12} className="shrink-0" />}
-                            </button>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleSelection(key, optionText)}
+                                className="hidden"
+                              />
+                              <div className="space-y-1">
+                                {rows.map((row, rowIndex) => (
+                                  <div key={rowIndex}>
+                                    {row.label && (
+                                      <span className="mr-2 text-xs font-semibold text-[#deff9a]/80">
+                                        {row.label}:
+                                      </span>
+                                    )}
+                                    <span className="text-sm text-white/80">{row.value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </label>
                           );
                         })}
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        {selections.C.map((key) => {
-                          const text = normalizeOptionText(selectedItems.C[key]);
-                          if (!text) return null;
-                          return (
+                      <div className="border-t border-white/10 pt-4">
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          {customTags.map((tag) => (
                             <span
-                              key={key}
-                              className="inline-flex items-center gap-1.5 rounded-full border border-[#deff9a]/55 bg-[#deff9a]/10 px-3 py-1.5 text-sm text-[#deff9a]"
+                              key={`custom-${tag}`}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#deff9a]/30 bg-[#deff9a]/5 px-3 py-1.5 text-sm text-[#deff9a]/90"
                             >
-                              <span className="max-w-[200px] truncate">{text.slice(0, 30)}{text.length > 30 ? "..." : ""}</span>
+                              {tag}
                               <button
                                 type="button"
-                                onClick={() => toggleSelection(key, text)}
-                                className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/70 transition hover:bg-[#deff9a]/20 hover:text-[#deff9a]"
+                                onClick={() => setCustomTags((prev) => prev.filter((t) => t !== tag))}
+                                className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/60 transition hover:bg-[#deff9a]/15 hover:text-[#deff9a]"
                               >
                                 <X size={12} />
                               </button>
                             </span>
-                          );
-                        })}
-                        {customTags.map((tag) => (
-                          <span
-                            key={`custom-${tag}`}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-[#deff9a]/30 bg-[#deff9a]/5 px-3 py-1.5 text-sm text-[#deff9a]/90"
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && tagInput.trim()) {
+                                e.preventDefault();
+                                const newTag = tagInput.trim();
+                                if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
+                                  setCustomTags((prev) => [...prev, newTag]);
+                                }
+                                setTagInput("");
+                              }
+                            }}
+                            placeholder="添加 AI 遗漏的核心概念..."
+                            className="flex-1 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (tagInput.trim()) {
+                                const newTag = tagInput.trim();
+                                if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
+                                  setCustomTags((prev) => [...prev, newTag]);
+                                }
+                                setTagInput("");
+                              }
+                            }}
+                            disabled={!tagInput.trim()}
+                            className="inline-flex items-center gap-1.5 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-sm text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20 disabled:opacity-40"
                           >
-                            <span className="max-w-[200px] truncate">{tag}</span>
-                            <button
-                              type="button"
-                              onClick={() => setCustomTags((prev) => prev.filter((t) => t !== tag))}
-                              className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/60 transition hover:bg-[#deff9a]/15 hover:text-[#deff9a]"
-                            >
-                              <X size={12} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && tagInput.trim()) {
-                              e.preventDefault();
-                              const newTag = tagInput.trim();
-                              if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
-                                setCustomTags((prev) => [...prev, newTag]);
-                              }
-                              setTagInput("");
-                            }
-                          }}
-                          placeholder="添加 AI 遗漏的核心概念..."
-                          className="flex-1 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (tagInput.trim()) {
-                              const newTag = tagInput.trim();
-                              if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
-                                setCustomTags((prev) => [...prev, newTag]);
-                              }
-                              setTagInput("");
-                            }
-                          }}
-                          disabled={!tagInput.trim()}
-                          className="inline-flex items-center gap-1.5 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-sm text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20 disabled:opacity-40"
-                        >
-                          <Plus size={14} />
-                          Add
-                        </button>
+                            <Plus size={14} />
+                            Add
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
