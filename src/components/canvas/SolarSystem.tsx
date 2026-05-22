@@ -118,11 +118,14 @@ const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.08,
     rotationSpeed: 1.1,
     color: "#4b70dd",
+    label: "Exocortex",
+    module: "exocortex",
     textureUrl: "/textures/2k_neptune.jpg",
     type: "Ice Giant",
     gravity: "11.15 m/s²",
     mass: "1.02 × 10²⁶ kg",
-    description: "The most distant major planet, Neptune is a dark, cold, and supersonic wind-whipped ice giant, appearing as a deep, vibrant blue world."
+    description:
+      "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex.",
   },
 ];
 

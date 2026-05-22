@@ -1,15 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSolarStore } from "@/src/store/solarStore";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
 
 interface NodeDetailPanelProps {
   onEnterArchive: () => void;
+  onEnterExocortex: () => void;
+  isRAGOpen: boolean;
 }
 
-export function NodeDetailPanel({ onEnterArchive }: NodeDetailPanelProps) {
+export function NodeDetailPanel({
+  onEnterArchive,
+  onEnterExocortex,
+  isRAGOpen,
+}: NodeDetailPanelProps) {
   const router = useRouter();
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
@@ -27,16 +34,25 @@ export function NodeDetailPanel({ onEnterArchive }: NodeDetailPanelProps) {
       case "knowledge-graph":
         router.push("/knowledge-graph");
         break;
+      case "exocortex":
+        onEnterExocortex();
+        break;
       default:
-        alert(`Entering ${focusedPlanet.label}...`);
+        alert(`Entering ${focusedPlanet.label ?? focusedPlanet.name}...`);
     }
   };
+
+  const isNeptune = focusedPlanet.name === "Neptune";
+  const panelTitle = isNeptune ? "Neptune - Exocortex" : focusedPlanet.name.toUpperCase();
+  const panelDescription = isNeptune
+    ? "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex."
+    : focusedPlanet.description;
 
   return (
     <GlassPanel className="pointer-events-auto absolute right-0 top-0 z-20 flex h-full w-80 flex-col border-y-0 border-r-0 p-6">
       <div className="mb-8">
         <h2 className="font-serif text-3xl tracking-widest text-[#deff9a]">
-          {focusedPlanet.name.toUpperCase()}
+          {panelTitle}
         </h2>
 
         <div className="mt-2 flex flex-col gap-1">
@@ -53,11 +69,22 @@ export function NodeDetailPanel({ onEnterArchive }: NodeDetailPanelProps) {
         </div>
       </div>
 
-      {focusedPlanet.description && (
-        <div className="mb-8 text-sm leading-relaxed tracking-wide text-white/70">
-          <p>{focusedPlanet.description}</p>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {!isRAGOpen && panelDescription ? (
+          <motion.div
+            key="planet-description"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="mb-8 overflow-hidden"
+          >
+            <div className="text-sm leading-relaxed tracking-wide text-white/70">
+              <p>{panelDescription}</p>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div className="space-y-4 text-sm">
         {focusedPlanet.mass && (
@@ -91,7 +118,16 @@ export function NodeDetailPanel({ onEnterArchive }: NodeDetailPanelProps) {
       </div>
 
       <div className="mt-auto pt-6">
-        {focusedPlanet.label && (
+        {isNeptune && (
+          <CyberButton
+            className="mb-3 w-full"
+            onClick={handleEnterSystem}
+          >
+            Access Exocortex
+          </CyberButton>
+        )}
+
+        {focusedPlanet.label && !isNeptune && (
           <CyberButton
             className="mb-3 w-full"
             onClick={handleEnterSystem}

@@ -151,9 +151,9 @@ describe("GalaxyWorkspace", () => {
           ok: true,
           json: async () => ({
             nodes: [
-              { id: "chunk-1", chapter_title: "制度与合作", chunk_index: 0 },
-              { id: "chunk-2", chapter_title: "分工", chunk_index: 1 },
-              { id: "chunk-3", chapter_title: "产权", chunk_index: 2 },
+              { id: "chunk-1", chapter_title: "制度与合作", chunk_index: 0, book_id: "book-a" },
+              { id: "chunk-2", chapter_title: "分工", chunk_index: 1, book_id: "book-b" },
+              { id: "chunk-3", chapter_title: "产权", chunk_index: 2, book_id: "book-a" },
             ],
           }),
         });

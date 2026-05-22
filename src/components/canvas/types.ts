@@ -1,6 +1,6 @@
-export type ModuleType = "archive" | "analytical-pipeline" | "knowledge-graph";
+export type ModuleType = "archive" | "analytical-pipeline" | "knowledge-graph" | "exocortex";
 
-export type PlanetLabel = "Archive" | "Analytical Pipeline" | "Knowledge Graph";
+export type PlanetLabel = "Archive" | "Analytical Pipeline" | "Knowledge Graph" | "Exocortex";
 
 export interface PlanetConfig {
   name: string;

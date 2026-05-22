@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  chatCompletionsCreate: vi.fn(),
   embeddingsCreate: vi.fn(),
   rpc: vi.fn(),
   openAIConstructor: vi.fn(),
@@ -12,6 +13,11 @@ vi.mock("openai", () => ({
     mocks.openAIConstructor(config);
 
     return {
+      chat: {
+        completions: {
+          create: mocks.chatCompletionsCreate,
+        },
+      },
       embeddings: {
         create: mocks.embeddingsCreate,
       },
@@ -56,6 +62,7 @@ describe("POST /api/search", () => {
     });
     expect(response.status).toBe(400);
     expect(mocks.embeddingsCreate).not.toHaveBeenCalled();
+    expect(mocks.chatCompletionsCreate).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
@@ -81,7 +88,16 @@ describe("POST /api/search", () => {
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 
-  it("embeds the query, calls search_chunks, and returns three typed results", async () => {
+  it("embeds the query, calls hybrid_search, and returns three typed results", async () => {
+    mocks.chatCompletionsCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: "规则 制度 Institutions 产权 Property Rights",
+          },
+        },
+      ],
+    });
     mocks.embeddingsCreate.mockResolvedValue({
       data: [{ embedding: [0.1, 0.2, 0.3] }],
     });
@@ -162,16 +178,34 @@ describe("POST /api/search", () => {
     );
     expect(mocks.embeddingsCreate).toHaveBeenCalledWith({
       model: "openai/text-embedding-3-small",
-      input: "规则如何促进合作？",
+      input: "规则 制度 Institutions 产权 Property Rights",
     });
-    expect(mocks.rpc).toHaveBeenCalledWith("search_chunks", {
+    expect(mocks.chatCompletionsCreate).toHaveBeenCalledWith(
+      {
+        model: "openai/gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是一个专业的经济学与政治哲学搜索引擎的提示词工程师。你的任务是提取用户提问的核心概念，并扩充相关的学术同义词、英文专有名词。请直接输出扩充后的搜索词，不要包含任何解释、标点或聊天废话。例如，用户输入'游戏规则'，你输出'游戏规则 Rules of the game 制度 Institutions 产权'。",
+          },
+          { role: "user", content: "规则如何促进合作？" },
+        ],
+      },
+      expect.any(Object)
+    );
+    expect(mocks.rpc).toHaveBeenCalledWith("hybrid_search", {
+      query_text: "规则 制度 Institutions 产权 Property Rights",
       query_embedding: [0.1, 0.2, 0.3],
       match_count: 3,
-      book_uuid: "dfd8559e-7f32-4bff-9b6e-c03da0d59a2d",
+      book_uuid_param: null,
     });
   });
 
   it("handles an empty embedding response", async () => {
+    mocks.chatCompletionsCreate.mockResolvedValue({
+      choices: [{ message: { content: "方法论个人主义 Methodological Individualism" } }],
+    });
     mocks.embeddingsCreate.mockResolvedValue({ data: [] });
 
     const response = await postSearch({ query: "方法论个人主义是什么？" });
@@ -179,24 +213,46 @@ describe("POST /api/search", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Embedding provider returned no vector.",
     });
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("surfaces Supabase RPC errors as gateway failures", async () => {
+    mocks.chatCompletionsCreate.mockResolvedValue({
+      choices: [{ message: { content: "产权 Property Rights" } }],
+    });
     mocks.embeddingsCreate.mockResolvedValue({
       data: [{ embedding: [0.1, 0.2, 0.3] }],
     });
     mocks.rpc.mockResolvedValue({
       data: null,
-      error: { message: "search_chunks failed" },
+      error: { message: "hybrid_search failed" },
     });
 
     const response = await postSearch({ query: "产权为何重要？" });
 
     await expect(response.json()).resolves.toEqual({
-      error: "search_chunks failed",
+      error: "hybrid_search failed",
     });
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
+  });
+
+  it("falls back to original query when rewrite fails", async () => {
+    mocks.chatCompletionsCreate.mockRejectedValue(new Error("rewrite timeout"));
+    mocks.embeddingsCreate.mockResolvedValue({
+      data: [{ embedding: [0.1, 0.2, 0.3] }],
+    });
+    mocks.rpc.mockResolvedValue({
+      data: [],
+      error: null,
+    });
+
+    const response = await postSearch({ query: "游戏规则" });
+
+    expect(response.status).toBe(200);
+    expect(mocks.embeddingsCreate).toHaveBeenCalledWith({
+      model: "openai/text-embedding-3-small",
+      input: "游戏规则",
+    });
   });
 });

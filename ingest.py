@@ -5,9 +5,12 @@ EPUB → Hierarchical Chunks → Summaries → Embeddings → Supabase
 """
 
 import os
+import glob
+import re
+import subprocess
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TypedDict
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -34,6 +37,11 @@ class Chapter:
     part_title: Optional[str]
     chapter_index: int
     title: str
+    content: str
+
+
+class MarkdownSection(TypedDict):
+    chapter_title: str
     content: str
 
 def parse_epub(epub_path: str) -> list[Chapter]:
@@ -65,6 +73,119 @@ def parse_epub(epub_path: str) -> list[Chapter]:
         ))
 
     print(f"[Parse] 成功解析，共找到 {len(chapters)} 个有效章节。")
+    return chapters
+
+
+def convert_pdf_to_md_with_marker(pdf_path: str, output_dir: str) -> str:
+    abs_pdf_path = os.path.abspath(pdf_path)
+    abs_output_dir = os.path.abspath(output_dir)
+
+    if not os.path.isfile(abs_pdf_path):
+        raise FileNotFoundError(f"PDF 文件不存在: {abs_pdf_path}")
+
+    os.makedirs(abs_output_dir, exist_ok=True)
+    print(f"[Marker] 开始转换 PDF -> Markdown: {abs_pdf_path}")
+
+    try:
+        completed = subprocess.run(
+            ["marker_single", abs_pdf_path, "--output_dir", abs_output_dir],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if completed.stdout.strip():
+            print(completed.stdout.strip())
+        if completed.stderr.strip():
+            print(completed.stderr.strip())
+    except subprocess.CalledProcessError as error:
+        stderr = error.stderr.strip() if error.stderr else "未知错误"
+        raise RuntimeError(f"marker_single 执行失败: {stderr}") from error
+
+    pdf_name = os.path.splitext(os.path.basename(abs_pdf_path))[0]
+    expected_dir = os.path.join(abs_output_dir, pdf_name)
+    candidates: list[str] = []
+
+    search_patterns = [
+        os.path.join(expected_dir, "*.md"),
+        os.path.join(expected_dir, "**", "*.md"),
+        os.path.join(abs_output_dir, "*.md"),
+        os.path.join(abs_output_dir, "**", "*.md"),
+    ]
+
+    for pattern in search_patterns:
+        candidates.extend(glob.glob(pattern, recursive=True))
+
+    if not candidates:
+        raise RuntimeError(f"Marker 转换成功但未找到 Markdown 文件: {abs_output_dir}")
+
+    candidates = sorted({os.path.abspath(path) for path in candidates})
+    preferred = [path for path in candidates if os.path.splitext(os.path.basename(path))[0] == pdf_name]
+    md_path = preferred[0] if preferred else candidates[0]
+    print(f"[Marker] 找到 Markdown 文件: {md_path}")
+    return md_path
+
+
+def parse_markdown(md_path: str) -> list[MarkdownSection]:
+    abs_md_path = os.path.abspath(md_path)
+
+    if not os.path.isfile(abs_md_path):
+        raise FileNotFoundError(f"Markdown 文件不存在: {abs_md_path}")
+
+    with open(abs_md_path, "r", encoding="utf-8") as file:
+        content = file.read()
+
+    heading_pattern = re.compile(r"^(#{1,2})\s+(.+?)\s*$", re.MULTILINE)
+    matches = list(heading_pattern.finditer(content))
+    sections: list[MarkdownSection] = []
+
+    if not matches:
+        text = content.strip()
+        if text:
+            sections.append({
+                "chapter_title": os.path.splitext(os.path.basename(abs_md_path))[0],
+                "content": text,
+            })
+        return sections
+
+    for index, match in enumerate(matches):
+        title = match.group(2).strip()
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        section_content = content[start:end].strip()
+
+        if not section_content:
+            continue
+
+        sections.append({
+            "chapter_title": title,
+            "content": section_content,
+        })
+
+    if not sections:
+        fallback_text = content.strip()
+        if fallback_text:
+            sections.append({
+                "chapter_title": os.path.splitext(os.path.basename(abs_md_path))[0],
+                "content": fallback_text,
+            })
+
+    print(f"[Parse] 成功解析 Markdown，共找到 {len(sections)} 个有效章节。")
+    return sections
+
+
+def markdown_sections_to_chapters(sections: list[MarkdownSection]) -> list[Chapter]:
+    chapters: list[Chapter] = []
+
+    for index, section in enumerate(sections, start=1):
+        chapters.append(
+            Chapter(
+                part_title=None,
+                chapter_index=index,
+                title=section["chapter_title"],
+                content=section["content"],
+            )
+        )
+
     return chapters
 
 # ── 2. 结构化分块 (中文强化版) ──────────────────────────────
@@ -195,9 +316,10 @@ def upload_book(chapters: list[Chapter], book_id: str, book_title: str, author: 
 # ── 启动舱 ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    TARGET_EPUB_PATH = os.environ.get("EPUB_PATH", "rag-pipeline/经济学的思维方式.epub")
-    BOOK_TITLE = "经济学的思维方式"
-    BOOK_AUTHOR = "Paul Heyne"
+    TARGET_PATH = os.environ.get("TARGET_PATH", "rag-pipeline/The_Deficit_Myth.epub")
+    MARKER_OUTPUT_DIR = os.environ.get("MARKER_OUTPUT_DIR", "./data/temp_md/")
+    BOOK_TITLE = "The_Deficit_Myth"
+    BOOK_AUTHOR = "Thomas Sowell"
 
     print(f"🚀 初始化 RAG 摄入管线: {BOOK_TITLE}")
 
@@ -218,5 +340,19 @@ if __name__ == "__main__":
         print(f"[Fatal Error] 无法在 rag_books 注册书籍，请检查表结构或权限: {e}")
         exit(1)
 
-    parsed_chapters = parse_epub(TARGET_EPUB_PATH)
+    target_path_lower = TARGET_PATH.lower()
+    if target_path_lower.endswith(".pdf"):
+        os.makedirs(MARKER_OUTPUT_DIR, exist_ok=True)
+        markdown_path = convert_pdf_to_md_with_marker(TARGET_PATH, MARKER_OUTPUT_DIR)
+        markdown_sections = parse_markdown(markdown_path)
+        parsed_chapters = markdown_sections_to_chapters(markdown_sections)
+    elif target_path_lower.endswith(".md"):
+        markdown_sections = parse_markdown(TARGET_PATH)
+        parsed_chapters = markdown_sections_to_chapters(markdown_sections)
+    elif target_path_lower.endswith(".epub"):
+        parsed_chapters = parse_epub(TARGET_PATH)
+    else:
+        print(f"[Fatal Error] 不支持的输入文件类型: {TARGET_PATH}")
+        exit(1)
+
     upload_book(parsed_chapters, book_id, BOOK_TITLE, BOOK_AUTHOR)

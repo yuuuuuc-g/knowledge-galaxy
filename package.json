@@ -22,6 +22,8 @@
     "@tiptap/starter-kit": "^3.23.4",
     "@types/three": "^0.184.1",
     "ai": "^6.0.185",
+    "framer-motion": "^12.40.0",
+    "framer-motion-3d": "^12.4.13",
     "lucide-react": "^1.16.0",
     "maath": "^0.10.8",
     "next": "16.2.6",

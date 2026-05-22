@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 // ✨ 引入 Environment 组件
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
+import { AnimatePresence, motion } from "framer-motion";
 import { CoreStar } from "@/src/components/canvas/CoreStar";
 import { SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
 import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
+import { GalaxyWorkspace } from "@/src/components/galaxy-workspace";
 import { useSolarStore } from "@/src/store/solarStore";
 
 function WebGLWarning() {
@@ -26,6 +28,7 @@ export default function Home() {
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
+  const [isRAGOpen, setIsRAGOpen] = useState(false);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
 
   const handleContextLost = useCallback((event: Event) => {
@@ -51,6 +54,12 @@ export default function Home() {
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
     };
   }, [handleContextLost, handleContextRestored]);
+
+  useEffect(() => {
+    if (focusedPlanet?.name !== "Neptune" && isRAGOpen) {
+      setIsRAGOpen(false);
+    }
+  }, [focusedPlanet, isRAGOpen]);
 
   return (
     <main className="relative h-screen w-screen bg-black">
@@ -115,11 +124,50 @@ export default function Home() {
         <SolarSystem />
       </Canvas>
 
-      <NodeDetailPanel onEnterArchive={() => setShowArchive(true)} />
+      <NodeDetailPanel
+        onEnterArchive={() => setShowArchive(true)}
+        onEnterExocortex={() => {
+          setShowArchive(false);
+          setIsRAGOpen(true);
+        }}
+        isRAGOpen={isRAGOpen}
+      />
 
       {showArchive && (
         <ArchivePanel onClose={() => setShowArchive(false)} />
       )}
+
+      <AnimatePresence>
+        {isRAGOpen && (
+          <motion.aside
+            className="absolute inset-y-0 right-0 z-30 flex h-full h-screen w-full max-w-[min(1100px,95vw)] flex-col border-l border-cyan-300/20 bg-black/95 shadow-[-24px_0_80px_rgba(0,0,0,0.6)]"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          >
+            <button
+              aria-label="Close Exocortex panel"
+              className="absolute right-4 top-4 z-40 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/65 transition-colors hover:text-white"
+              onClick={() => setIsRAGOpen(false)}
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M18 6L6 18" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+            <GalaxyWorkspace />
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

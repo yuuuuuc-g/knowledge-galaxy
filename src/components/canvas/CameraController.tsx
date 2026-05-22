@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useTime } from "framer-motion-3d";
 import * as THREE from "three";
 import { useSolarStore } from "@/src/store/solarStore";
 
@@ -11,6 +12,7 @@ const LERP_SPEED = 3.5;
 export function CameraController() {
   const { camera, scene } = useThree();
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
+  const motionTime = useTime();
   
   const targetPosition = useRef(new THREE.Vector3().copy(INITIAL_CAMERA_POSITION));
   const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
@@ -48,7 +50,8 @@ export function CameraController() {
       targetLookAt.current.copy(planetWorldPos);
     }
 
-    camera.position.lerp(targetPosition.current, delta * LERP_SPEED);
+    const speedFactor = 0.95 + Math.sin(motionTime.get() / 1000) * 0.05;
+    camera.position.lerp(targetPosition.current, delta * LERP_SPEED * speedFactor);
     
     const currentLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
     currentLookAt.lerp(targetLookAt.current, delta * LERP_SPEED);

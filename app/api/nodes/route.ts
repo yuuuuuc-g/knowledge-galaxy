@@ -1,7 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-const BOOK_UUID = "dfd8559e-7f32-4bff-9b6e-c03da0d59a2d";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -9,6 +7,7 @@ export interface NodeData {
   id: string;
   chapter_title: string;
   chunk_index: number;
+  book_id: string;
 }
 
 export type NodesData = NodeData[];
@@ -21,6 +20,7 @@ interface RagChunkNodeRow {
   id?: unknown;
   chapter_title?: unknown;
   chunk_index?: unknown;
+  book_id?: unknown;
 }
 
 function jsonError(message: string, status: number) {
@@ -42,7 +42,8 @@ function isNodeData(row: RagChunkNodeRow): row is NodeData {
     typeof row.id === "string" &&
     typeof row.chapter_title === "string" &&
     typeof row.chunk_index === "number" &&
-    Number.isInteger(row.chunk_index)
+    Number.isInteger(row.chunk_index) &&
+    typeof row.book_id === "string"
   );
 }
 
@@ -62,8 +63,7 @@ export async function GET() {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { data, error } = await supabase
       .from("rag_chunks")
-      .select("id, chapter_title, chunk_index")
-      .eq("book_id", BOOK_UUID)
+      .select("id, chapter_title, chunk_index, book_id")
       .order("chunk_index", { ascending: true });
 
     if (error) {

@@ -6,6 +6,7 @@ import { OrbitControls, Stars } from "@react-three/drei";
 import type { SearchResult } from "@/app/api/search/route";
 import type { NodeData, NodesData } from "@/app/api/nodes/route";
 import { GalaxyNodes } from "@/src/components/canvas/GalaxyNodes";
+import { CopyButton } from "@/src/components/ui/CopyButton";
 
 const MAX_RENDERED_RESULTS = 3;
 
@@ -49,7 +50,8 @@ function isNodeData(value: unknown): value is NodeData {
   return (
     typeof row.id === "string" &&
     typeof row.chapter_title === "string" &&
-    typeof row.chunk_index === "number"
+    typeof row.chunk_index === "number" &&
+    typeof row.book_id === "string"
   );
 }
 
@@ -59,16 +61,22 @@ const GalaxyCanvasLayer = memo(function GalaxyCanvasLayer({
 }: GalaxyCanvasLayerProps) {
   return (
     <Canvas
-      className="absolute inset-0 z-0"
-      camera={{ position: [0, 1.8, 7], fov: 45 }}
+      className="pointer-events-auto absolute inset-0 z-0 touch-none"
+      camera={{ position: [0, 1.8, 5.6], fov: 45 }}
       dpr={[1, 1.25]}
-      frameloop="demand"
+      frameloop="always"
+      onWheel={(event) => {
+        event.stopPropagation();
+      }}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+      }}
     >
       <ambientLight intensity={0.55} />
       <pointLight color="#67e8f9" intensity={2.2} position={[3, 3, 4]} />
       <Stars radius={42} depth={32} count={120} factor={3} fade speed={0.25} />
       <GalaxyNodes highlightedNodeId={highlightedNodeId} nodesData={nodes} />
-      <OrbitControls enablePan={false} minDistance={4} maxDistance={12} />
+      <OrbitControls enablePan enableZoom minDistance={2.8} maxDistance={9} panSpeed={0.75} zoomSpeed={0.85} />
     </Canvas>
   );
 });
@@ -230,14 +238,15 @@ export function GalaxyWorkspace() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-white">
-      <GalaxyCanvasLayer highlightedNodeId={highlightedNodeId} nodes={nodes} />
+    <main className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-black text-white">
+      <div className="flex-1 w-full relative min-h-0">
+        <GalaxyCanvasLayer highlightedNodeId={highlightedNodeId} nodes={nodes} />
 
-      <section
-        className="pointer-events-none absolute inset-0 z-10 flex items-start justify-between gap-6 p-6"
-        data-testid="search-hud"
-      >
-        <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/75 p-5 shadow-[0_0_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <section
+          className="pointer-events-none absolute inset-0 z-10 flex items-start justify-between gap-4 p-4 lg:gap-6 lg:p-6"
+          data-testid="search-hud"
+        >
+          <div className="pointer-events-auto w-full max-w-[min(28rem,42vw)] rounded-2xl border border-white/10 bg-black/75 p-5 shadow-[0_0_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">
             Exocortex RAG
           </p>
@@ -272,10 +281,11 @@ export function GalaxyWorkspace() {
           </form>
 
           <div
-            className="mt-5 min-h-32 rounded-2xl border border-cyan-300/20 bg-cyan-950/20 p-4 shadow-[inset_0_0_24px_rgba(34,211,238,0.08)]"
+            className="group relative mt-5 min-h-32 rounded-2xl border border-cyan-300/20 bg-cyan-950/20 p-4 shadow-[inset_0_0_24px_rgba(34,211,238,0.08)]"
             data-testid="ai-response"
           >
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <CopyButton textToCopy={aiResponse} />
+            <div className="mb-2 flex items-center justify-between gap-3 pr-8">
               <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/60">
                 Generation
               </p>
@@ -298,44 +308,46 @@ export function GalaxyWorkspace() {
               {nodesError}
             </p>
           )}
-        </div>
+          </div>
 
-        <aside
-          className="pointer-events-auto max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-black/70 p-4 shadow-[0_0_40px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-          data-testid="search-results"
-        >
-          <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-            Top Matches
-          </p>
-
-          {renderedResults.length === 0 ? (
-            <p className="mt-4 text-sm leading-6 text-white/50">
-              Run a search to surface the three most relevant chunks.
+          <aside
+            className="pointer-events-auto max-h-[calc(100%-2rem)] w-full max-w-[min(22rem,34vw)] overflow-y-auto rounded-2xl border border-white/10 bg-transparent p-4 shadow-[0_0_40px_rgba(0,0,0,0.45)]"
+            data-testid="search-results"
+          >
+            <p className="text-xs uppercase tracking-[0.28em] text-white/40">
+              Top Matches
             </p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {renderedResults.map((result, index) => (
-                <article
-                  className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
-                  key={result.id}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold text-cyan-100">
-                      {index + 1}. {result.chapter_title}
-                    </h2>
-                    <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">
-                      {result.similarity.toFixed(3)}
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-4 text-sm leading-6 text-white/65">
-                    {result.content}
-                  </p>
-                </article>
-              ))}
-            </div>
-          )}
-        </aside>
-      </section>
+
+            {renderedResults.length === 0 ? (
+              <p className="mt-4 text-sm leading-6 text-white/50">
+                Run a search to surface the three most relevant chunks.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {renderedResults.map((result, index) => (
+                  <article
+                    className="relative rounded-xl border border-white/10 bg-white/[0.04] p-4"
+                    key={result.id}
+                  >
+                    <CopyButton textToCopy={result.content} />
+                    <div className="flex items-center justify-between gap-3 pr-8">
+                      <h2 className="text-sm font-semibold text-cyan-100">
+                        {index + 1}. {result.chapter_title}
+                      </h2>
+                      <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">
+                        {result.similarity.toFixed(3)}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-4 text-sm leading-6 text-white/65">
+                      {result.content}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </aside>
+        </section>
+      </div>
     </main>
   );
 }
