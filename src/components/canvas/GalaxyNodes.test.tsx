@@ -62,7 +62,7 @@ describe("GalaxyNodes", () => {
     updateGalaxyNodeColors(mesh, nodesData, "chunk-2", colorArray);
 
     expect(setColorAt).toHaveBeenCalledTimes(3);
-    expect(setColorAt).toHaveBeenNthCalledWith(2, 1, new THREE.Color("#fbbf24"));
+    expect(setColorAt).toHaveBeenNthCalledWith(2, 1, new THREE.Color("#fcd34d"));
     expect(mesh.instanceColor.needsUpdate).toBe(true);
   });
 

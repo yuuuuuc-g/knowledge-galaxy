@@ -72,8 +72,10 @@ const GalaxyCanvasLayer = memo(function GalaxyCanvasLayer({
         event.stopPropagation();
       }}
     >
-      <ambientLight intensity={0.55} />
-      <pointLight color="#67e8f9" intensity={2.2} position={[3, 3, 4]} />
+      <ambientLight intensity={1.85} />
+      <directionalLight color="#dbeafe" intensity={1.4} position={[0, 4, 5]} />
+      <pointLight color="#67e8f9" intensity={6.2} position={[3, 3, 4]} />
+      <pointLight color="#e879f9" intensity={3.3} position={[-3, -2, 3]} />
       <Stars radius={42} depth={32} count={120} factor={3} fade speed={0.25} />
       <GalaxyNodes highlightedNodeId={highlightedNodeId} nodesData={nodes} />
       <OrbitControls enablePan enableZoom minDistance={2.8} maxDistance={9} panSpeed={0.75} zoomSpeed={0.85} />

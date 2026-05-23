@@ -5,8 +5,8 @@ import * as THREE from "three";
 import type { NodeData } from "@/app/api/nodes/route";
 
 const NODE_RADIUS = 0.055;
-const HIGHLIGHT_COLOR = new THREE.Color("#fbbf24");
-const DEEP_JEWEL_TONES = [0x115e59, 0x7f1d1d, 0x3730a3, 0x3f6212, 0x9a3412, 0x7e22ce] as const;
+const HIGHLIGHT_COLOR = new THREE.Color("#fcd34d");
+const NEON_PALETTE = [0x22d3ee, 0x10b981, 0xfcd34d, 0xe879f9, 0x67e8f9, 0xa78bfa] as const;
 const SPIRAL_BASE_RADIUS = 1.6;
 const SPIRAL_RADIUS_STEP = 0.035;
 const SPIRAL_RING_COUNT = 37;
@@ -64,7 +64,7 @@ function buildBookColorMap(nodesData: GalaxyNodeInput[]): Map<string, THREE.Colo
   const bookColorMap = new Map<string, THREE.Color>();
 
   uniqueBookIds.forEach((bookId, index) => {
-    const colorHex = DEEP_JEWEL_TONES[index % DEEP_JEWEL_TONES.length];
+    const colorHex = NEON_PALETTE[index % NEON_PALETTE.length];
     bookColorMap.set(bookId, new THREE.Color(colorHex));
   });
 
@@ -81,8 +81,9 @@ export function buildGalaxyNodeBuffers(nodesData: GalaxyNodeInput[]): GalaxyNode
   const tempPositions = new Float32Array(total * 3);
   const colorArray = new Float32Array(total * 3);
   const bookColorMap = buildBookColorMap(nodesData);
-  const fallbackColor = new THREE.Color(DEEP_JEWEL_TONES[0]);
+    const fallbackColor = new THREE.Color(NEON_PALETTE[0]);
   const maxRadius = SPIRAL_BASE_RADIUS + (SPIRAL_RING_COUNT - 1) * SPIRAL_RADIUS_STEP;
+  const glowBias = new THREE.Color("#ecfeff");
 
   for (let index = 0; index < total; index += 1) {
     const node = nodesData[index];
@@ -93,14 +94,14 @@ export function buildGalaxyNodeBuffers(nodesData: GalaxyNodeInput[]): GalaxyNode
     tempPositions[positionOffset + 2] = position.z;
 
     const baseColor = bookColorMap.get(node.book_id) ?? fallbackColor;
-    const liftedColor = baseColor.clone().lerp(new THREE.Color("#94a3b8"), 0.28);
+    const liftedColor = baseColor.clone().lerp(glowBias, 0.1);
     const radialDistance = Math.sqrt(position.x ** 2 + position.z ** 2);
     const radialProgress = THREE.MathUtils.clamp(
       (radialDistance - SPIRAL_BASE_RADIUS) / (maxRadius - SPIRAL_BASE_RADIUS),
       0,
       1
     );
-    const brightnessFactor = 0.9 + (1 - radialProgress) * 0.14;
+    const brightnessFactor = 1 + (1 - radialProgress) * 0.2;
 
     colorArray[positionOffset] = liftedColor.r * brightnessFactor;
     colorArray[positionOffset + 1] = liftedColor.g * brightnessFactor;
@@ -143,10 +144,16 @@ export function GalaxyNodes({ nodesData, highlightedNodeId }: GalaxyNodesProps) 
     []
   );
   const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ toneMapped: false }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        emissive: new THREE.Color("#67e8f9"),
+        emissiveIntensity: 1.1,
+        roughness: 0.2,
+        metalness: 0.15,
+        toneMapped: false,
+      }),
     []
   );
-
   useEffect(() => {
     const mesh = meshRef.current;
 
