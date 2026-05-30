@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { SearchResult } from "@/app/api/search/route";
+import type { SearchResult } from "@/src/lib/local-search";
 import type { NodeData, NodesData } from "@/app/api/nodes/route";
 import { GalaxyNodes } from "@/src/components/canvas/GalaxyNodes";
 import { CopyButton } from "@/src/components/ui/CopyButton";
