@@ -78,19 +78,17 @@ describe("SunConsole", () => {
     });
 
     expect(container.textContent).toContain("Module Placeholder");
+    expect(container.textContent).toContain("Intelligence Board");
     expect(container.textContent).toContain("STANDBY");
     expect(container.textContent).toContain("ONLINE");
   });
 
-  it("uses the night earth texture for the central situation map", () => {
+  it("does not render the former central earth situation map inside the intelligence board", () => {
     renderSunConsole();
-    const centralEarth = container.querySelector<HTMLElement>(
-      '[data-testid="central-earth-situation-map"]'
-    );
 
-    expect(centralEarth?.style.backgroundImage).toContain(
-      "/textures/2k_earth_nightmap.jpg"
-    );
+    expect(
+      container.querySelector('[data-testid="central-earth-situation-map"]')
+    ).toBeNull();
   });
 
   it("renders a compact waveform for fleet system health", () => {
@@ -100,45 +98,283 @@ describe("SunConsole", () => {
     expect(waveform?.querySelectorAll("path")).toHaveLength(2);
   });
 
-  it("renders native SVG micro charts and updates chart data every second", () => {
+  it("renders native SVG micro charts and updates chart data every second", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-09T03:04:05Z"));
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/data/macro-intel.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [
+              {
+                id: 1,
+                title: "地方债发行节奏加快",
+                source: "Macro Desk",
+                url: "https://example.test/macro-signal",
+                eventType: "fiscal",
+                coreLogic: "财政前置发力。",
+                policyIntent: "稳投资。",
+                capitalImpact: "基建链条改善。",
+                affectedRegions: ["China"],
+                affectedSectors: ["infrastructure"],
+                timeHorizon: "short",
+                confidence: 0.82,
+                impactScore: 88,
+                evidence: ["地方债发行提速。"],
+                publishedAt: "2026-06-09T02:00:00.000Z",
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.startsWith("/data/macro-raw-articles.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: "2026-06-09T03:04:05.000Z",
+          items: [],
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
     renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     const ringChart = container.querySelector('[data-testid="micro-chart-ring"]');
     const lineChart = container.querySelector('[data-testid="micro-chart-line"]');
     const barCharts = container.querySelectorAll('[data-testid="micro-chart-bar"]');
     const initialBars = barCharts[0]?.querySelectorAll("rect");
-    const initialLastBarHeight = initialBars?.[initialBars.length - 1]?.getAttribute("height");
+    const initialBarHeights = Array.from(initialBars ?? []).map((bar) =>
+      bar.getAttribute("height")
+    );
 
     expect(ringChart?.querySelector("circle")).not.toBeNull();
     expect(lineChart?.querySelector("polyline")).not.toBeNull();
     expect(barCharts).toHaveLength(2);
+    expect(container.textContent).toContain("SOURCE SYNC");
+    expect(container.textContent).toContain("RAW VOLUME");
+    expect(container.textContent).toContain("IMPACT DENSITY");
+    expect(container.textContent).toContain("ANALYST CONFIDENCE");
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(1000);
+      await Promise.resolve();
     });
 
     const updatedBars = container
       .querySelectorAll('[data-testid="micro-chart-bar"]')[0]
       ?.querySelectorAll("rect");
-    expect(updatedBars?.[updatedBars.length - 1]?.getAttribute("height")).not.toBe(
-      initialLastBarHeight
+    const updatedBarHeights = Array.from(updatedBars ?? []).map((bar) =>
+      bar.getAttribute("height")
     );
+    expect(updatedBarHeights).not.toEqual(initialBarHeights);
   });
 
-  it("loads APAC supply-chain rows from generated crawler JSON", async () => {
+  it("loads clickable APAC supply-chain rows from the dynamic API", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/data/macro-intel.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      if (url.startsWith("/data/macro-raw-articles.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      if (url.startsWith("/api/apac-supply-chain")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [
+              {
+                id: 1,
+                label: "新加坡枢纽",
+                subtitle: "Live Feed · example.test",
+                value: "Cargo throughput rises on APAC lanes",
+                metricLabel: "Maritime Signal",
+                icon: "port",
+                variant: "positive",
+                url: "https://example.test/apac-cargo",
+                publishedAt: "2026-06-09T02:00:00.000Z",
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.startsWith("/data/macro-raw-articles.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: "2026-06-08T03:04:05.000Z",
+          items: [
+            {
+              id: 1,
+              label: "缓存航运",
+              subtitle: "Cache · example.test",
+              value: "Cached APAC maritime article",
+              metricLabel: "Cached Signal",
+              icon: "port",
+              url: "https://example.test/cache-cargo",
+            },
+          ],
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/apac-supply-chain?t="),
+      expect.objectContaining({ cache: "no-store" })
+    );
+    expect(container.textContent).toContain("Cargo throughput rises on APAC lanes");
+    expect(container.textContent).toContain("Updated 09/06, 11:04 BJT");
+
+    const articleLink = container.querySelector<HTMLAnchorElement>(
+      'a[href="https://example.test/apac-cargo"]'
+    );
+
+    expect(articleLink?.target).toBe("_blank");
+    expect(articleLink?.getAttribute("rel")).toBe("noreferrer");
+  });
+
+  it("loads structured macro intelligence into the intelligence board", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/data/macro-intel.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            items: [
+              {
+                id: 1,
+                title: "地方债发行节奏加快",
+                source: "Macro Desk",
+                url: "https://example.test/macro-signal",
+                eventType: "fiscal",
+                coreLogic: "财政前置发力，地方融资压力向基建链条传导。",
+                policyIntent: "稳投资与稳预期。",
+                capitalImpact: "基建链条短期改善。",
+                affectedRegions: ["China"],
+                affectedSectors: ["infrastructure"],
+                timeHorizon: "short",
+                confidence: 0.82,
+                impactScore: 88,
+                evidence: ["地方债发行提速。"],
+                publishedAt: "2026-06-09T02:00:00.000Z",
+              },
+            ],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: "2026-06-09T03:04:05.000Z",
+          items: [],
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("信息板 / INTELLIGENCE BOARD");
+    expect(container.textContent).toContain("地方债发行节奏加快");
+    expect(container.textContent).not.toContain("财政前置发力");
+    expect(container.textContent).not.toContain("Impact 88");
+    expect(
+      container.querySelector('a[href="https://example.test/macro-signal"]')
+    ).not.toBeNull();
+  });
+
+  it("only renders APAC dynamic rows that have readable article URLs", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
+        generatedAt: "2026-06-09T03:04:05.000Z",
         items: [
           {
             id: 1,
-            label: "新加坡枢纽",
+            label: "中国供应链",
             subtitle: "Live Feed · example.test",
-            value: "Cargo throughput rises on APAC lanes",
+            value: "Live item with URL",
             metricLabel: "Maritime Signal",
             icon: "port",
-            variant: "positive",
+            url: "https://example.test/live-1",
+          },
+          {
+            id: 2,
+            label: "占位供应链",
+            subtitle: "Awaiting live crawl",
+            value: "Live fallback without URL",
+            metricLabel: "Maritime Signal",
+            icon: "port",
           },
         ],
       }),
@@ -151,11 +387,80 @@ describe("SunConsole", () => {
       await Promise.resolve();
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/data/apac-supply-chain.json?t="),
-      expect.objectContaining({ cache: "no-store" })
+    const articleLinks = container.querySelectorAll<HTMLAnchorElement>(
+      'a[aria-label^="Read APAC supply-chain article"]'
     );
-    expect(container.textContent).toContain("Cargo throughput rises on APAC lanes");
+
+    expect(articleLinks).toHaveLength(1);
+    expect(container.querySelector('a[href="https://example.test/live-1"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Live fallback without URL");
+  });
+
+  it("refreshes APAC supply-chain data every hour while the console is open", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/data/macro-intel.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      if (url.startsWith("/data/macro-raw-articles.json")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: url.startsWith("/api/apac-supply-chain")
+            ? "2026-06-09T03:04:05.000Z"
+            : "2026-06-08T03:04:05.000Z",
+          items: [
+            {
+              id: 1,
+              label: "新加坡枢纽",
+              subtitle: "Live Feed · example.test",
+              value: "Cargo throughput rises on APAC lanes",
+              metricLabel: "Maritime Signal",
+              icon: "port",
+              url: "https://example.test/apac-cargo",
+            },
+          ],
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      vi.advanceTimersByTime(60 * 60 * 1000);
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
   it("allows placeholder planets to be selected from the navigation", () => {

@@ -4,14 +4,12 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
   Box,
   Building2,
-  CheckCircle2,
+  ExternalLink,
   Factory,
   Lock,
-  Radio,
   ShieldCheck,
   TrendingUp,
   X,
@@ -31,17 +29,16 @@ interface DataItem {
   variant?: "default" | "positive" | "warning" | "alert";
 }
 
-interface NoticeItem extends DataItem {
-  icon: "check" | "cube" | "alert" | "signal";
-}
-
 interface SupplyItem extends DataItem {
   icon: "port" | "factory" | "zone" | "chain" | "market" | "trade";
   subtitle: string;
   metricLabel: string;
+  url?: string;
+  publishedAt?: string | null;
 }
 
 interface MetricItem {
+  key: "sourceCoverage" | "rawVolume" | "impactDensity" | "analystConfidence";
   label: string;
   detail: string;
   variant?: "default" | "positive";
@@ -49,10 +46,59 @@ interface MetricItem {
 }
 
 interface MicroChartState {
-  syncProgress: number;
-  latency: number[];
-  throughput: number[];
-  eventRate: number[];
+  sourceCoverage: number;
+  rawVolume: number[];
+  impactDensity: number[];
+  analystConfidence: number[];
+}
+
+interface SupplyPayload {
+  generatedAt?: string;
+  items?: unknown;
+}
+
+type MacroEventType =
+  | "policy"
+  | "macro_data"
+  | "trade"
+  | "fiscal"
+  | "capital_market"
+  | "geopolitics";
+
+type MacroTimeHorizon = "short" | "medium" | "long";
+
+interface MacroIntelItem {
+  id: number;
+  title: string;
+  source: string;
+  url: string;
+  eventType: MacroEventType;
+  coreLogic: string;
+  policyIntent: string;
+  capitalImpact: string;
+  affectedRegions: string[];
+  affectedSectors: string[];
+  timeHorizon: MacroTimeHorizon;
+  confidence: number;
+  impactScore: number;
+  evidence: string[];
+  publishedAt?: string | null;
+}
+
+interface MacroIntelPayload {
+  generatedAt?: string;
+  sourceCount?: number;
+  candidatesCount?: number;
+  successfulSourceCount?: number;
+  items?: unknown;
+}
+
+interface RawMacroPayload {
+  generatedAt?: string;
+  sourceCount?: number;
+  candidatesCount?: number;
+  successfulSourceCount?: number;
+  items?: unknown;
 }
 
 type PlanetNavStatus = "online" | "standby";
@@ -87,35 +133,28 @@ const PLANET_STATUS_LABEL: Record<PlanetNavStatus, string> = {
   standby: "STANDBY",
 };
 
-const NOTICES: NoticeItem[] = [
-  { id: 1, label: "06:00 UTC", value: "Sincronización de datos completada", icon: "check", variant: "positive" },
-  { id: 2, label: "08:30 UTC", value: "Nueva carga de embeddings disponible", icon: "cube" },
-  { id: 3, label: "10:15 UTC", value: "Mantenimiento programado: Sector Marte 14:00 UTC", icon: "alert", variant: "warning" },
-  { id: 4, label: "12:00 UTC", value: "Alerta: latencia elevada en nodo Jupiter", icon: "signal", variant: "alert" },
-];
-
-const APAC_FALLBACK_ITEMS: SupplyItem[] = [
-  { id: 1, label: "深圳港", subtitle: "Shenzhen Port", value: "吞吐量 semanal: 2.4M TEU", metricLabel: "Throughput", icon: "port" },
-  { id: 2, label: "苏州工业园", subtitle: "Suzhou Industrial Park", value: "外资引入: USD 890M (Q3)", metricLabel: "FDI Inflow", icon: "factory" },
-  { id: 3, label: "上海出口加工区", subtitle: "Shanghai Export Processing Zone", value: "物流动态: 正常", metricLabel: "Logistics Status", icon: "zone", variant: "positive" },
-  { id: 4, label: "东莞供应链", subtitle: "Dongguan Supply Chain", value: "预警: 中断 nivel amarillo", metricLabel: "Alert: Interruption - Yellow", icon: "chain", variant: "warning" },
-  { id: 5, label: "义乌小商品", subtitle: "Yiwu Commodities", value: "Índice de precios: +1.2%", metricLabel: "Price Index", icon: "market", variant: "positive" },
-  { id: 6, label: "香港自贸港", subtitle: "Hong Kong FTZ", value: "Tráfico marítimo: +4.5%", metricLabel: "Maritime Traffic", icon: "trade", variant: "positive" },
-];
-
 const METRICS: MetricItem[] = [
-  { label: "DATA SYNC", detail: "Integrity", variant: "positive", chart: "ring" },
-  { label: "NETWORK LATENCY", detail: "Median", chart: "line" },
-  { label: "THROUGHPUT", detail: "Pipeline", chart: "bar" },
-  { label: "EVENT RATE", detail: "Telemetry", chart: "bar" },
+  {
+    key: "sourceCoverage",
+    label: "SOURCE SYNC",
+    detail: "Sources",
+    variant: "positive",
+    chart: "ring",
+  },
+  { key: "rawVolume", label: "RAW VOLUME", detail: "Candidates", chart: "line" },
+  { key: "impactDensity", label: "IMPACT DENSITY", detail: "Score Buckets", chart: "bar" },
+  { key: "analystConfidence", label: "ANALYST CONFIDENCE", detail: "LLM Evidence", chart: "bar" },
 ];
 
 const INITIAL_MICRO_CHARTS: MicroChartState = {
-  syncProgress: 97.3,
-  latency: [108, 112, 104, 119, 116, 128, 122, 134, 128],
-  throughput: [1.4, 1.6, 1.5, 1.8, 1.7, 2.0, 2.1, 2.3, 2.4],
-  eventRate: [2.1, 2.8, 2.4, 3.1, 2.2, 2.7, 3.0, 2.6, 3.2],
+  sourceCoverage: 0,
+  rawVolume: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  impactDensity: [0, 0, 0, 0],
+  analystConfidence: [0, 0, 0, 0],
 };
+
+const APAC_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const MACRO_INTEL_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 const CHAMFER_STYLE: CSSProperties = {
   clipPath:
@@ -137,21 +176,6 @@ function valueClass(variant?: DataItem["variant"]) {
       return "text-fuchsia-400 drop-shadow-[0_0_4px_rgba(232,121,249,0.6)]";
     default:
       return "text-slate-300";
-  }
-}
-
-function noticeIcon(icon: NoticeItem["icon"]) {
-  const iconClassName = "h-3 w-3";
-
-  switch (icon) {
-    case "check":
-      return <CheckCircle2 className={iconClassName} aria-hidden="true" />;
-    case "cube":
-      return <Box className={iconClassName} aria-hidden="true" />;
-    case "alert":
-      return <AlertTriangle className={iconClassName} aria-hidden="true" />;
-    case "signal":
-      return <Radio className={iconClassName} aria-hidden="true" />;
   }
 }
 
@@ -210,7 +234,11 @@ function isSupplyItem(value: unknown): value is SupplyItem {
     typeof value.value === "string" &&
     typeof value.metricLabel === "string" &&
     isSupplyIcon(value.icon) &&
-    isDataVariant(value.variant)
+    isDataVariant(value.variant) &&
+    (value.url === undefined || typeof value.url === "string") &&
+    (value.publishedAt === undefined ||
+      value.publishedAt === null ||
+      typeof value.publishedAt === "string")
   );
 }
 
@@ -218,11 +246,69 @@ function isSupplyItemArray(value: unknown): value is SupplyItem[] {
   return Array.isArray(value) && value.every(isSupplyItem);
 }
 
+function isMacroEventType(value: unknown): value is MacroEventType {
+  return (
+    value === "policy" ||
+    value === "macro_data" ||
+    value === "trade" ||
+    value === "fiscal" ||
+    value === "capital_market" ||
+    value === "geopolitics"
+  );
+}
+
+function isMacroTimeHorizon(value: unknown): value is MacroTimeHorizon {
+  return value === "short" || value === "medium" || value === "long";
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isMacroIntelItem(value: unknown): value is MacroIntelItem {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "number" &&
+    typeof value.title === "string" &&
+    typeof value.source === "string" &&
+    typeof value.url === "string" &&
+    isMacroEventType(value.eventType) &&
+    typeof value.coreLogic === "string" &&
+    typeof value.policyIntent === "string" &&
+    typeof value.capitalImpact === "string" &&
+    isStringArray(value.affectedRegions) &&
+    isStringArray(value.affectedSectors) &&
+    isMacroTimeHorizon(value.timeHorizon) &&
+    typeof value.confidence === "number" &&
+    typeof value.impactScore === "number" &&
+    isStringArray(value.evidence) &&
+    (value.publishedAt === undefined ||
+      value.publishedAt === null ||
+      typeof value.publishedAt === "string")
+  );
+}
+
+function isMacroIntelItemArray(value: unknown): value is MacroIntelItem[] {
+  return Array.isArray(value) && value.every(isMacroIntelItem);
+}
+
 const BEIJING_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   hour12: false,
   minute: "2-digit",
   second: "2-digit",
+  timeZone: "Asia/Shanghai",
+});
+
+const APAC_UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  hour: "2-digit",
+  hour12: false,
+  minute: "2-digit",
+  month: "2-digit",
   timeZone: "Asia/Shanghai",
 });
 
@@ -240,12 +326,71 @@ function nextSeries(values: number[], min: number, max: number) {
   return [...values.slice(1), Number(next.toFixed(1))];
 }
 
+function nextIntegerSeries(values: number[], min: number, max: number) {
+  const last = values[values.length - 1] ?? min;
+  const delta = ((last * 11 + values.length * 5) % 5) - 2;
+  const next = Math.min(max, Math.max(min, last + delta));
+
+  return [...values.slice(1), next];
+}
+
 function average(values: number[]) {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function normalize(value: number, min: number, max: number) {
+  if (max <= min) {
+    return 0;
+  }
+
   return (value - min) / (max - min);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function metricAverage(values: number[]) {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  return average(values);
+}
+
+function buildImpactDensity(items: MacroIntelItem[]) {
+  const buckets = [0, 0, 0, 0];
+
+  items.forEach((item) => {
+    if (item.impactScore >= 90) {
+      buckets[3] += 1;
+    } else if (item.impactScore >= 80) {
+      buckets[2] += 1;
+    } else if (item.impactScore >= 70) {
+      buckets[1] += 1;
+    } else if (item.impactScore >= 60) {
+      buckets[0] += 1;
+    }
+  });
+
+  return buckets;
+}
+
+function buildConfidenceSeries(items: MacroIntelItem[]) {
+  const values = items
+    .map((item) => Math.round(clamp(item.confidence, 0, 1) * 100))
+    .slice(0, 4);
+
+  return values.length > 0 ? values : [0, 0, 0, 0];
+}
+
+function buildRawVolumeSeries(candidatesCount: number) {
+  const base = Math.max(0, candidatesCount);
+
+  return Array.from({ length: 9 }, (_, index) => {
+    const offset = ((index * 7 + base) % 5) - 2;
+    return Math.max(0, base + offset);
+  });
 }
 
 function buildLinePath(values: number[], min: number, max: number) {
@@ -257,6 +402,27 @@ function buildLinePath(values: number[], min: number, max: number) {
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+}
+
+function formatApacUpdatedAt(value: string | null) {
+  if (!value) {
+    return "pending";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "pending";
+  }
+
+  return APAC_UPDATED_AT_FORMATTER.format(date);
+}
+
+function formatMacroGeneratedAt(value: string | null) {
+  return formatApacUpdatedAt(value);
+}
+
+function hasReadableUrl(item: SupplyItem) {
+  return typeof item.url === "string" && item.url.length > 0;
 }
 
 interface RingProgressChartProps {
@@ -384,8 +550,11 @@ function BarMicroChart({ values, min, max }: BarMicroChartProps) {
         strokeWidth="1"
       />
       {values.map((value, index) => {
-        const height = 5 + normalize(value, min, max) * 24;
-        const x = index * 11 + 2;
+        const normalized = clamp(normalize(value, min, max), 0, 1);
+        const height = 5 + normalized * 24;
+        const slotWidth = 100 / Math.max(values.length, 1);
+        const width = Math.min(10, Math.max(6, slotWidth * 0.46));
+        const x = index * slotWidth + (slotWidth - width) / 2;
         const y = 31 - height;
 
         return (
@@ -408,7 +577,10 @@ function BarMicroChart({ values, min, max }: BarMicroChartProps) {
 
 export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps) {
   const [hoveredPlanetId, setHoveredPlanetId] = useState<string | null>(null);
-  const [supplyItems, setSupplyItems] = useState<SupplyItem[]>(APAC_FALLBACK_ITEMS);
+  const [macroIntelItems, setMacroIntelItems] = useState<MacroIntelItem[]>([]);
+  const [macroIntelGeneratedAt, setMacroIntelGeneratedAt] = useState<string | null>(null);
+  const [supplyItems, setSupplyItems] = useState<SupplyItem[]>([]);
+  const [supplyGeneratedAt, setSupplyGeneratedAt] = useState<string | null>(null);
   const [beijingTime, setBeijingTime] = useState(() =>
     BEIJING_TIME_FORMATTER.format(new Date())
   );
@@ -431,51 +603,169 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
       return;
     }
 
-    const controller = new AbortController();
+    let isDisposed = false;
+    let controller: AbortController | null = null;
 
     async function loadSupplyChainData() {
+      controller?.abort();
+      const requestController = new AbortController();
+      controller = requestController;
+
       try {
-        const response = await fetch(`/data/apac-supply-chain.json?t=${Date.now()}`, {
+        const timestamp = Date.now();
+        const response = await fetch(`/api/apac-supply-chain?t=${timestamp}`, {
           cache: "no-store",
-          signal: controller.signal,
+          signal: requestController.signal,
         });
         if (!response.ok) {
-          return;
+          throw new Error(`APAC API returned ${response.status}`);
         }
 
-        const payload: unknown = await response.json();
-        if (
-          typeof payload === "object" &&
-          payload !== null &&
-          "items" in payload &&
-          isSupplyItemArray(payload.items)
-        ) {
-          setSupplyItems(payload.items);
+        const apiPayload = (await response.json()) as SupplyPayload;
+        const apiItems = isSupplyItemArray(apiPayload.items)
+          ? apiPayload.items.filter(hasReadableUrl)
+          : [];
+
+        if (!isDisposed) {
+          setSupplyItems(apiItems);
+          setSupplyGeneratedAt(
+            typeof apiPayload?.generatedAt === "string"
+              ? apiPayload.generatedAt
+              : new Date().toISOString()
+          );
         }
       } catch (error) {
-        if (!controller.signal.aborted) {
+        if (!requestController.signal.aborted && !isDisposed) {
           console.warn("[SunConsole] APAC supply-chain data unavailable", error);
+          setSupplyItems([]);
+          setSupplyGeneratedAt(null);
         }
       }
     }
 
     loadSupplyChainData();
+    const refreshTimerId = window.setInterval(
+      loadSupplyChainData,
+      APAC_REFRESH_INTERVAL_MS
+    );
 
     return () => {
-      controller.abort();
+      isDisposed = true;
+      window.clearInterval(refreshTimerId);
+      controller?.abort();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || typeof fetch !== "function") {
+      return;
+    }
+
+    let isDisposed = false;
+    let controller: AbortController | null = null;
+
+    async function loadMacroIntelData() {
+      controller?.abort();
+      const requestController = new AbortController();
+      controller = requestController;
+
+      try {
+        const timestamp = Date.now();
+        const [intelResponse, rawResponse] = await Promise.all([
+          fetch(`/data/macro-intel.json?t=${timestamp}`, {
+            cache: "no-store",
+            signal: requestController.signal,
+          }),
+          fetch(`/data/macro-raw-articles.json?t=${timestamp}`, {
+            cache: "no-store",
+            signal: requestController.signal,
+          }),
+        ]);
+        if (!intelResponse.ok) {
+          throw new Error(`Macro intel feed returned ${intelResponse.status}`);
+        }
+        if (!rawResponse.ok) {
+          throw new Error(`Raw macro article feed returned ${rawResponse.status}`);
+        }
+
+        const payload = (await intelResponse.json()) as MacroIntelPayload;
+        const rawPayload = (await rawResponse.json()) as RawMacroPayload;
+        const items = isMacroIntelItemArray(payload.items) ? payload.items : [];
+        const sourceCount =
+          typeof rawPayload.sourceCount === "number"
+            ? rawPayload.sourceCount
+            : typeof payload.sourceCount === "number"
+              ? payload.sourceCount
+              : 0;
+        const successfulSourceCount =
+          typeof rawPayload.successfulSourceCount === "number"
+            ? rawPayload.successfulSourceCount
+            : typeof payload.successfulSourceCount === "number"
+              ? payload.successfulSourceCount
+              : sourceCount > 0
+                ? sourceCount
+                : 0;
+        const candidatesCount =
+          typeof rawPayload.candidatesCount === "number"
+            ? rawPayload.candidatesCount
+            : typeof payload.candidatesCount === "number"
+              ? payload.candidatesCount
+              : items.length;
+        const sourceCoverage =
+          sourceCount > 0
+            ? Number(((successfulSourceCount / sourceCount) * 100).toFixed(1))
+            : 0;
+
+        if (!isDisposed) {
+          setMacroIntelItems(items.slice(0, 4));
+          setMicroCharts({
+            sourceCoverage: clamp(sourceCoverage, 0, 100),
+            rawVolume: buildRawVolumeSeries(candidatesCount),
+            impactDensity: buildImpactDensity(items),
+            analystConfidence: buildConfidenceSeries(items),
+          });
+          setMacroIntelGeneratedAt(
+            typeof payload.generatedAt === "string"
+              ? payload.generatedAt
+              : new Date().toISOString()
+          );
+        }
+      } catch (error) {
+        if (!requestController.signal.aborted && !isDisposed) {
+          console.warn("[SunConsole] macro intelligence feed unavailable", error);
+          setMacroIntelItems([]);
+          setMacroIntelGeneratedAt(null);
+        }
+      }
+    }
+
+    loadMacroIntelData();
+    const refreshTimerId = window.setInterval(
+      loadMacroIntelData,
+      MACRO_INTEL_REFRESH_INTERVAL_MS
+    );
+
+    return () => {
+      isDisposed = true;
+      window.clearInterval(refreshTimerId);
+      controller?.abort();
     };
   }, [isOpen]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
       setMicroCharts((current) => ({
-        syncProgress:
-          current.syncProgress >= 98.8
-            ? 96.8
-            : Number((current.syncProgress + 0.2).toFixed(1)),
-        latency: nextSeries(current.latency, 96, 142),
-        throughput: nextSeries(current.throughput, 1.2, 2.8),
-        eventRate: nextSeries(current.eventRate, 1.8, 3.6),
+        sourceCoverage: current.sourceCoverage,
+        rawVolume: nextIntegerSeries(
+          current.rawVolume,
+          0,
+          Math.max(12, Math.max(...current.rawVolume) + 2)
+        ),
+        impactDensity: current.impactDensity.map((value, index) => {
+          const direction = ((current.rawVolume.at(-1) ?? 0) + index) % 2 === 0 ? 1 : -1;
+          return clamp(value + direction, 0, Math.max(4, ...current.impactDensity));
+        }),
+        analystConfidence: nextSeries(current.analystConfidence, 0, 100),
       }));
     }, 1000);
 
@@ -660,76 +950,70 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                 data-testid="sun-console-main"
               >
                 <section
-                  className={panelClassName("grid min-h-0 min-w-0 grid-rows-[30px_150px_minmax(270px,1fr)_104px] gap-2.5 p-3")}
+                  className={panelClassName("grid min-h-0 min-w-0 grid-rows-[30px_minmax(0,1fr)_104px] gap-2.5 p-3")}
                   style={CHAMFER_STYLE}
                 >
                   <div className="flex items-center justify-between border-b border-cyan-500/20">
-                    <h2 className="font-mono text-xs tracking-wider text-cyan-300">公告栏 / NOTICE BOARD</h2>
+                    <h2 className="font-mono text-xs tracking-wider text-cyan-300">信息板 / INTELLIGENCE BOARD</h2>
                     <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-widest text-slate-500">
-                      Live Feed <Activity className="h-3 w-3 text-emerald-400" aria-hidden="true" />
+                      Updated {formatMacroGeneratedAt(macroIntelGeneratedAt)} BJT
+                      <Activity className="h-3 w-3 text-emerald-400" aria-hidden="true" />
                     </span>
                   </div>
 
                   <ul className="space-y-1.5 overflow-hidden">
-                    {NOTICES.map((note) => (
+                    {macroIntelItems.length > 0 ? (
+                      macroIntelItems.map((item) => (
+                        <li key={item.id}>
+                          <a
+                            aria-label={`Read macro intelligence source: ${item.title}`}
+                            className="flex h-[33px] items-center border border-cyan-900/40 bg-slate-950/45 px-2.5 font-mono text-[10px] text-cyan-100 transition-all duration-200 hover:border-cyan-400/70 hover:bg-cyan-500/10 focus:outline-none focus:ring-1 focus:ring-cyan-300/80"
+                            href={item.url}
+                            rel="noreferrer"
+                            style={SMALL_CHAMFER_STYLE}
+                            target="_blank"
+                          >
+                            <span className="truncate">{item.title}</span>
+                          </a>
+                        </li>
+                      ))
+                    ) : (
                       <li
-                        key={note.id}
-                        className="grid h-[33px] grid-cols-[66px_20px_minmax(0,1fr)] items-center gap-2 border border-cyan-900/40 bg-slate-950/45 px-2.5 font-mono text-[10px]"
+                        className="grid h-[33px] grid-cols-[58px_minmax(0,1fr)_72px] items-center gap-2 border border-cyan-900/40 bg-slate-950/45 px-2.5 font-mono text-[10px]"
                         style={SMALL_CHAMFER_STYLE}
                       >
-                        <span className="text-cyan-300">{note.label}</span>
-                        <span className={`grid h-4 w-4 place-items-center rounded-full border ${valueClass(note.variant)} border-current/40`}>
-                          {noticeIcon(note.icon)}
+                        <span className="grid h-4 place-items-center border border-cyan-400/40 text-[8px] text-cyan-300">
+                          IDLE
                         </span>
-                        <span className={`truncate ${valueClass(note.variant)}`}>
-                          {note.value}
+                        <span className="truncate text-slate-400">
+                          Awaiting macro intelligence pipeline output
                         </span>
+                        <span className="text-right text-[8px] text-slate-600">No Signal</span>
                       </li>
-                    ))}
+                    )}
                   </ul>
-
-                  <div className="relative min-h-0 overflow-visible bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.16),transparent_48%)]">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.18),transparent_34%),linear-gradient(rgba(34,211,238,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.025)_1px,transparent_1px)] bg-[size:auto,26px_26px,26px_26px]" />
-                    <div
-                      className="absolute left-1/2 top-1/2 h-[min(30vh,330px)] w-[min(30vh,330px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/30 bg-cover bg-center opacity-95 shadow-[0_0_55px_rgba(34,211,238,0.42),inset_-30px_-20px_80px_rgba(0,0,0,0.78)]"
-                      data-testid="central-earth-situation-map"
-                      style={{ backgroundImage: "url('/textures/2k_earth_nightmap.jpg')" }}
-                    />
-                    <div className="absolute left-1/2 top-1/2 h-[min(38vh,420px)] w-[min(38vh,420px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/25" />
-                    <div className="absolute left-1/2 top-1/2 h-[min(44vh,480px)] w-[min(44vh,480px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/15" />
-                    <div className="absolute right-[12%] top-[36%] font-mono text-xs uppercase text-emerald-300">
-                      Earth
-                      <div className="text-[10px] text-emerald-400/70">Online</div>
-                    </div>
-                    <div className="absolute bottom-[28%] left-[12%] font-mono text-xs uppercase text-fuchsia-300">
-                      Jupiter
-                      <div className="text-[10px] text-fuchsia-300/70">Latency High</div>
-                    </div>
-                    <div className="absolute bottom-[22%] right-[16%] font-mono text-xs uppercase text-amber-300">
-                      Mars
-                      <div className="text-[10px] text-amber-300/70">Maintenance</div>
-                    </div>
-                  </div>
 
                   <div className="grid min-h-0 grid-cols-2 gap-2 lg:grid-cols-4">
                     {METRICS.map((metric) => {
+                      const rawVolumeMax = Math.max(12, ...microCharts.rawVolume);
+                      const impactMax = Math.max(4, ...microCharts.impactDensity);
                       const value =
-                        metric.chart === "ring"
-                          ? `${microCharts.syncProgress.toFixed(1)}%`
-                          : metric.label === "NETWORK LATENCY"
-                            ? `${Math.round(average(microCharts.latency))} ms`
-                            : metric.label === "THROUGHPUT"
-                              ? `${microCharts.throughput.at(-1)?.toFixed(1) ?? "2.4"} Tb/s`
-                              : `${microCharts.eventRate.at(-1)?.toFixed(1) ?? "3.2"} k/s`;
+                        metric.key === "sourceCoverage"
+                          ? `${microCharts.sourceCoverage.toFixed(1)}%`
+                          : metric.key === "rawVolume"
+                            ? `${microCharts.rawVolume.at(-1) ?? 0} raw`
+                            : metric.key === "impactDensity"
+                              ? `${microCharts.impactDensity.reduce((total, count) => total + count, 0)} sig`
+                              : `${Math.round(metricAverage(microCharts.analystConfidence))}%`;
                       const chart =
-                        metric.chart === "ring" ? (
-                          <RingProgressChart value={microCharts.syncProgress} />
-                        ) : metric.label === "NETWORK LATENCY" ? (
-                          <LineMicroChart values={microCharts.latency} min={96} max={142} />
-                        ) : metric.label === "THROUGHPUT" ? (
-                          <BarMicroChart values={microCharts.throughput} min={1.2} max={2.8} />
+                        metric.key === "sourceCoverage" ? (
+                          <RingProgressChart value={microCharts.sourceCoverage} />
+                        ) : metric.key === "rawVolume" ? (
+                          <LineMicroChart values={microCharts.rawVolume} min={0} max={rawVolumeMax} />
+                        ) : metric.key === "impactDensity" ? (
+                          <BarMicroChart values={microCharts.impactDensity} min={0} max={impactMax} />
                         ) : (
-                          <BarMicroChart values={microCharts.eventRate} min={1.8} max={3.6} />
+                          <BarMicroChart values={microCharts.analystConfidence} min={0} max={100} />
                         );
 
                       return (
@@ -738,7 +1022,7 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                           className="border border-cyan-900/50 bg-slate-950/70 p-2"
                           style={SMALL_CHAMFER_STYLE}
                         >
-                          <div className="font-mono text-[8px] uppercase tracking-widest text-slate-500">{metric.label}</div>
+                          <div className="whitespace-nowrap font-mono text-[7px] uppercase tracking-[0.12em] text-slate-500">{metric.label}</div>
                           <div className={`mt-1 font-mono text-[17px] leading-none ${metric.variant === "positive" ? "text-emerald-300" : "text-cyan-300"}`}>{value}</div>
                           <div className="mt-1">{chart}</div>
                           <div className="mt-1 font-mono text-[8px] uppercase tracking-widest text-slate-600">{metric.detail}</div>
@@ -755,7 +1039,9 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                   >
                     <div className="flex items-center justify-between border-b border-cyan-500/20">
                       <h2 className="font-mono text-xs tracking-wider text-cyan-300">APAC / SUPPLY CHAIN</h2>
-                      <span className="font-mono text-[8px] uppercase tracking-widest text-slate-500">Region Overview</span>
+                      <span className="font-mono text-[8px] uppercase tracking-widest text-slate-500">
+                        Updated {formatApacUpdatedAt(supplyGeneratedAt)} BJT
+                      </span>
                     </div>
 
                     <div
@@ -775,27 +1061,57 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                     </div>
 
                     <ul className="min-h-0 space-y-1 overflow-hidden">
-                      {supplyItems.map((item) => (
-                        <li
-                          key={item.id}
-                          className="grid h-[43px] grid-cols-[30px_minmax(0,1fr)_minmax(132px,auto)] items-center gap-2 border border-cyan-900/50 bg-slate-950/55 px-2.5"
-                          style={SMALL_CHAMFER_STYLE}
-                        >
-                          <span className="grid h-7 w-7 place-items-center border border-cyan-500/35 bg-cyan-500/10 text-cyan-300">
-                            {supplyIcon(item.icon)}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs text-slate-200">{item.label}</span>
-                            <span className="block truncate font-mono text-[9px] text-slate-500">{item.subtitle}</span>
-                          </span>
-                          <span
-                            className={`min-w-0 text-right font-mono text-[10px] ${valueClass(item.variant)}`}
-                          >
-                            <span className="block truncate">{item.value}</span>
-                            <span className="block truncate text-[9px] text-slate-500">{item.metricLabel}</span>
-                          </span>
-                        </li>
-                      ))}
+                      {supplyItems.map((item) => {
+                        const rowContent = (
+                          <>
+                            <span className="grid h-7 w-7 place-items-center border border-cyan-500/35 bg-cyan-500/10 text-cyan-300">
+                              {supplyIcon(item.icon)}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="flex min-w-0 items-center gap-1 text-xs text-slate-200">
+                                <span className="truncate">{item.label}</span>
+                                {item.url ? (
+                                  <ExternalLink
+                                    aria-hidden="true"
+                                    className="h-3 w-3 shrink-0 text-cyan-300/70"
+                                  />
+                                ) : null}
+                              </span>
+                              <span className="block truncate font-mono text-[9px] text-slate-500">{item.subtitle}</span>
+                            </span>
+                            <span
+                              className={`min-w-0 text-right font-mono text-[10px] ${valueClass(item.variant)}`}
+                            >
+                              <span className="block truncate">{item.value}</span>
+                              <span className="block truncate text-[9px] text-slate-500">{item.metricLabel}</span>
+                            </span>
+                          </>
+                        );
+
+                        return (
+                          <li key={item.id}>
+                            {item.url ? (
+                              <a
+                                aria-label={`Read APAC supply-chain article: ${item.value}`}
+                                className="grid h-[43px] grid-cols-[30px_minmax(0,1fr)_minmax(132px,auto)] items-center gap-2 border border-cyan-900/50 bg-slate-950/55 px-2.5 transition-all duration-200 hover:border-cyan-400/70 hover:bg-cyan-500/10 hover:shadow-[0_0_18px_rgba(34,211,238,0.18)] focus:outline-none focus:ring-1 focus:ring-cyan-300/80"
+                                href={item.url}
+                                rel="noreferrer"
+                                style={SMALL_CHAMFER_STYLE}
+                                target="_blank"
+                              >
+                                {rowContent}
+                              </a>
+                            ) : (
+                              <div
+                                className="grid h-[43px] grid-cols-[30px_minmax(0,1fr)_minmax(132px,auto)] items-center gap-2 border border-cyan-900/50 bg-slate-950/55 px-2.5"
+                                style={SMALL_CHAMFER_STYLE}
+                              >
+                                {rowContent}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
 

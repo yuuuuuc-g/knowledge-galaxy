@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "fetch:apac-supply-chain": "node scripts/fetch-apac-supply-chain.mjs",
+    "fetch:macro-intel": "node scripts/fetch-macro-intel.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest"
@@ -37,6 +38,7 @@
     "remark-gfm": "^4.0.1",
     "rss-parser": "^3.13.0",
     "three": "^0.184.0",
+    "undici": "^7.25.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },

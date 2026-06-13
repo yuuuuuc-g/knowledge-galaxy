@@ -188,7 +188,7 @@ export async function GET(request: Request) {
   let selected: z.infer<typeof briefingArraySchema>["briefings"];
   try {
     const { text: rawText } = await generateText({
-      model: deepseek.chat("deepseek-chat"),
+      model: deepseek.chat("deepseek-v4-pro"),
       system: EDITOR_SYSTEM_PROMPT,
       prompt: buildEditorialPrompt(allHeadlines),
       temperature: 0.3,

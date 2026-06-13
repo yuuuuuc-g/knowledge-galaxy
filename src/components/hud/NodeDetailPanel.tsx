@@ -10,6 +10,7 @@ interface NodeDetailPanelProps {
   onEnterArchive: () => void;
   onEnterKnowledgeGraph: () => void;
   onEnterExocortex: () => void;
+  onEnterMacroIntel: () => void;
   onOpenSaturnRadar: () => void;
   isRAGOpen: boolean;
 }
@@ -19,6 +20,7 @@ export function NodeDetailPanel({
   onEnterArchive,
   onEnterKnowledgeGraph,
   onEnterExocortex,
+  onEnterMacroIntel,
   onOpenSaturnRadar,
   isRAGOpen,
 }: NodeDetailPanelProps) {
@@ -41,6 +43,9 @@ export function NodeDetailPanel({
       case "exocortex":
         onEnterExocortex();
         break;
+      case "macro-intel":
+        onEnterMacroIntel();
+        break;
       default:
         alert(`Entering ${focusedPlanet.label ?? focusedPlanet.name}...`);
     }
@@ -48,11 +53,14 @@ export function NodeDetailPanel({
 
   const isNeptune = focusedPlanet.name === "Neptune";
   const isSaturn = focusedPlanet.name === "Saturn";
+  const isUranus = focusedPlanet.name === "Uranus";
   const panelTitle = isNeptune ? "Neptune" : focusedPlanet.name.toUpperCase();
   const panelDescription = isNeptune
     ? "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex."
     : isSaturn
       ? "Global macro intelligence radar. Sweep tier-1 media feeds daily and surface 5–10 structurally significant headlines for cross-border policy and business."
+      : isUranus
+        ? "Structured macro intelligence database. Read extracted source signals, policy intent, capital impact, evidence, confidence, and source links."
       : focusedPlanet.description;
 
   return (
@@ -143,7 +151,16 @@ export function NodeDetailPanel({
           </CyberButton>
         )}
 
-        {focusedPlanet.label && !isNeptune && (
+        {isUranus && (
+          <CyberButton
+            className="mb-3 w-full"
+            onClick={handleEnterSystem}
+          >
+            Open Intelligence DB
+          </CyberButton>
+        )}
+
+        {focusedPlanet.label && !isNeptune && !isUranus && (
           <CyberButton
             className="mb-3 w-full"
             onClick={handleEnterSystem}

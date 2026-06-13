@@ -231,7 +231,7 @@ def generate_chapter_summary(chapter: Chapter, book_title: str, author: str) -> 
     try:
         # ✨ 修复点 1：使用专门的 llm_client 调用 Gemini 模型
         resp = llm_client.chat.completions.create(
-            model="deepseek-chat",  # ✨ 替换为 DeepSeek 模型
+            model="deepseek-v4-pro",  # ✨ 替换为 DeepSeek 模型
             messages=[{
                 "role": "user",
                 "content": f"""你是《{book_title}》（作者：{author}）的专属学术研究助手。

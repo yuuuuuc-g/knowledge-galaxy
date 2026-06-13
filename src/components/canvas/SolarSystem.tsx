@@ -101,11 +101,14 @@ export const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.1,
     rotationSpeed: 1.2,
     color: "#a7d6d6",
+    label: "Intelligence Board",
+    module: "macro-intel",
     textureUrl: "/textures/2k_uranus.jpg",
     type: "Ice Giant",
     gravity: "8.87 m/s²",
     mass: "8.68 × 10²⁵ kg",
-    description: "An ice giant that peculiarly rotates on its side. Uranus has a pale blue-green color due to methane in its atmosphere and experiences extreme seasonal variations."
+    description:
+      "The macro intelligence archive for structured policy, fiscal, trade, and capital-market signals extracted from source feeds.",
   },
   {
     name: "Neptune",

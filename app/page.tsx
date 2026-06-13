@@ -14,6 +14,7 @@ import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
 import { GalaxyTerminalHUD } from "@/src/components/hud/GalaxyTerminalHUD";
 import { SunConsole } from "@/src/components/hud/SunConsole";
 import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
+import { MacroIntelConsole } from "@/src/components/hud/MacroIntelConsole";
 import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
 import { useSolarStore } from "@/src/store/solarStore";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
@@ -24,10 +25,11 @@ type ActiveSystem =
   | "knowledge-graph"
   | "exocortex"
   | "saturn"
+  | "macro-intel"
   | null;
 
 const SYSTEM_FRAMES: Record<
-  Exclude<ActiveSystem, "archive" | "saturn" | null>,
+  Exclude<ActiveSystem, "archive" | "saturn" | "macro-intel" | null>,
   { eyebrow: string; title: string; src: string }
 > = {
   "analytical-pipeline": {
@@ -159,7 +161,10 @@ export default function Home() {
   }, [handleContextLost, handleContextRestored]);
 
   useEffect(() => {
-    if (focusedPlanet?.name !== "Saturn" && activeSystem === "saturn") {
+    if (
+      ((activeSystem === "saturn" && focusedPlanet?.name !== "Saturn") ||
+        (activeSystem === "macro-intel" && focusedPlanet?.name !== "Uranus"))
+    ) {
       setActiveSystem(null);
     }
   }, [activeSystem, focusedPlanet?.name]);
@@ -261,6 +266,7 @@ export default function Home() {
           onEnterArchive={() => setActiveSystem("archive")}
           onEnterKnowledgeGraph={() => setActiveSystem("knowledge-graph")}
           onEnterExocortex={() => setActiveSystem("exocortex")}
+          onEnterMacroIntel={() => setActiveSystem("macro-intel")}
           onOpenSaturnRadar={() => setActiveSystem("saturn")}
           isRAGOpen={activeSystem === "exocortex"}
         />
@@ -281,9 +287,15 @@ export default function Home() {
         onClose={() => setActiveSystem(null)}
       />
 
+      <MacroIntelConsole
+        isOpen={activeSystem === "macro-intel"}
+        onClose={() => setActiveSystem(null)}
+      />
+
       {activeSystem &&
         activeSystem !== "archive" &&
-        activeSystem !== "saturn" && (
+        activeSystem !== "saturn" &&
+        activeSystem !== "macro-intel" && (
           <SystemFrameConsole
             isOpen
             onClose={() => setActiveSystem(null)}

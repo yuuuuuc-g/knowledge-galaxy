@@ -3,10 +3,23 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, Radar, RefreshCw, X } from "lucide-react";
-import { createClient } from "@/src/lib/supabase/client";
-import type { Database } from "@/src/lib/database.types";
 
-type DailyBriefing = Database["public"]["Tables"]["daily_briefings"]["Row"];
+interface RawMacroArticle {
+  id: number;
+  source: string;
+  title: string;
+  url: string;
+  snippet: string;
+  publishedAt: string | null;
+  score: number;
+}
+
+interface RawMacroPayload {
+  generatedAt?: string;
+  sourceCount?: number;
+  candidatesCount?: number;
+  items?: unknown;
+}
 
 interface SaturnConsoleProps {
   isOpen: boolean;
@@ -14,7 +27,14 @@ interface SaturnConsoleProps {
 }
 
 function formatTradingDate(value: string): string {
-  return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function hostnameOf(url: string): string {
@@ -25,8 +45,25 @@ function hostnameOf(url: string): string {
   }
 }
 
+function isRawMacroArticle(value: unknown): value is RawMacroArticle {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as RawMacroArticle).id === "number" &&
+    typeof (value as RawMacroArticle).source === "string" &&
+    typeof (value as RawMacroArticle).title === "string" &&
+    typeof (value as RawMacroArticle).url === "string" &&
+    typeof (value as RawMacroArticle).snippet === "string"
+  );
+}
+
+function isRawMacroArticleArray(value: unknown): value is RawMacroArticle[] {
+  return Array.isArray(value) && value.every(isRawMacroArticle);
+}
+
 export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
-  const [briefings, setBriefings] = useState<DailyBriefing[]>([]);
+  const [articles, setArticles] = useState<RawMacroArticle[]>([]);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -40,43 +77,34 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
     async function loadBriefings() {
       setLoading(true);
       setError(null);
-      const supabase = createClient();
-      const today = new Date().toISOString().slice(0, 10);
 
-      const { data, error: queryError } = await supabase
-        .from("daily_briefings")
-        .select("*")
-        .eq("date", today)
-        .order("created_at", { ascending: false });
-
-      if (cancelled) return;
-
-      if (queryError) {
-        setError(queryError.message);
-        setBriefings([]);
-        setLoading(false);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        const { data: fallback, error: fallbackError } = await supabase
-          .from("daily_briefings")
-          .select("*")
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(10);
+      try {
+        const response = await fetch(`/data/macro-raw-articles.json?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`Raw macro article feed returned ${response.status}`);
+        }
 
         if (cancelled) return;
-        if (fallbackError) {
-          setError(fallbackError.message);
-          setBriefings([]);
-        } else {
-          setBriefings(fallback ?? []);
+        const payload = (await response.json()) as RawMacroPayload;
+        setArticles(isRawMacroArticleArray(payload.items) ? payload.items : []);
+        setGeneratedAt(
+          typeof payload.generatedAt === "string"
+            ? payload.generatedAt
+            : new Date().toISOString()
+        );
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Load failed");
+          setArticles([]);
+          setGeneratedAt(null);
         }
-      } else {
-        setBriefings(data);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     }
 
     loadBriefings();
@@ -86,7 +114,7 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
     };
   }, [isOpen, reloadKey]);
 
-  const latestDate = briefings[0]?.date ?? new Date().toISOString().slice(0, 10);
+  const latestDate = generatedAt ?? new Date().toISOString();
 
   return (
     <AnimatePresence>
@@ -114,13 +142,13 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
               <div>
                 <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.35em] text-yellow-300/90">
                   <Radar size={14} aria-hidden="true" />
-                  <span>SATURN // GLOBAL RADAR</span>
+                  <span>SATURN // RAW ARTICLE RADAR</span>
                 </div>
                 <h2 className="mt-2 font-serif text-2xl tracking-widest text-white/95">
                   Daily Macro Briefings
                 </h2>
                 <p className="mt-1 font-mono text-[11px] tracking-wider text-white/35">
-                  TRADING DATE · {formatTradingDate(latestDate)} · {briefings.length} SIGNALS
+                  RAW FEED · {formatTradingDate(latestDate)} BJT · {articles.length} ARTICLES
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -149,10 +177,10 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
             </header>
 
             <div className="max-h-[68vh] overflow-y-auto px-7 py-6">
-              {loading && briefings.length === 0 && (
+              {loading && articles.length === 0 && (
                 <div className="flex items-center gap-3 font-mono text-xs tracking-widest text-yellow-200/70">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-yellow-300" />
-                  <span>SWEEPING ORBITAL FEEDS…</span>
+                  <span>LOADING SHARED MACRO FEED...</span>
                 </div>
               )}
 
@@ -162,17 +190,17 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
                 </div>
               )}
 
-              {!loading && !error && briefings.length === 0 && (
+              {!loading && !error && articles.length === 0 && (
                 <div className="flex flex-col items-start gap-2 font-mono text-xs text-white/55">
-                  <span className="tracking-widest text-yellow-300/80">NO SIGNALS</span>
+                  <span className="tracking-widest text-yellow-300/80">NO ARTICLES</span>
                   <span className="text-white/40">
-                    今日尚未由 Vercel Cron 拉取情报。可手动触发 `GET /api/cron/fetch-news` 或等待下一次定时任务。
+                    Run `npm run fetch:macro-intel` to generate the shared raw article feed.
                   </span>
                 </div>
               )}
 
               <ol className="space-y-3">
-                {briefings.map((item, index) => (
+                {articles.map((item, index) => (
                   <li
                     key={item.id}
                     className="group relative overflow-hidden rounded-lg border border-white/10 bg-zinc-950/60 transition hover:border-yellow-300/35 hover:bg-zinc-900/70"
@@ -205,7 +233,7 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
                         {item.title}
                       </p>
                       <p className="mt-2 border-l border-yellow-300/30 pl-3 text-xs leading-relaxed text-yellow-100/70">
-                        {item.ai_summary}
+                        {item.snippet || "No summary available from RSS source."}
                       </p>
                     </a>
                     <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-yellow-300/60 to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -215,7 +243,7 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
             </div>
 
             <footer className="border-t border-white/10 bg-black/40 px-7 py-3 font-mono text-[10px] tracking-widest text-white/35">
-              SCAN · 8 TIER-1 SOURCES · DEEPSEEK EDITORIAL FILTER · 5-10 SIGNALS / CYCLE
+              SHARED FEED · SAME SOURCES AS URANUS · RAW ARTICLES BEFORE DEEPSEEK ANALYSIS
             </footer>
           </motion.div>
         </motion.div>
