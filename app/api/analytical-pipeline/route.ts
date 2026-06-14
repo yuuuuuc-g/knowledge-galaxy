@@ -1,6 +1,6 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import OpenAI from "openai";
+import type { LanguageModel } from "ai";
 import { createClient } from "@supabase/supabase-js";
+import { createAiSdkLanguageModel, createOpenAICompatibleClient } from "@/src/modules/ai/provider-adapter";
 import { createRagRepository } from "@/src/modules/rag/repository";
 import {
   isRefineryPhase,
@@ -14,19 +14,8 @@ interface RefineryRequestBody {
   bookUuid?: unknown;
 }
 
-const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
 const MAX_PROMPT_CHARS = 4_000;
 const MAX_TOPIC_TITLE_CHARS = 200;
-
-const deepseek = createOpenAI({
-  baseURL: "https://api.deepseek.com/v1",
-  apiKey: process.env.DEEPSEEK_API_KEY,
-});
-
-const kimi = createOpenAI({
-  baseURL: "https://api.moonshot.cn/v1",
-  apiKey: process.env.KIMI_API_KEY,
-});
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -74,10 +63,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "bookUuid must be a valid UUID when provided." }, { status: 400 });
   }
 
-  const model = process.env.REFINERY_MODEL === "kimi"
-    ? kimi.chat("moonshot-v1-8k")
-    : deepseek.chat("deepseek-v4-pro");
-
   if (typeof prompt !== "string" || prompt.trim().length === 0) {
     return Response.json({ error: "A non-empty prompt string is required." }, { status: 400 });
   }
@@ -97,10 +82,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const embeddingClient = new OpenAI({
-    apiKey: process.env.SILICONFLOW_API_KEY,
-    baseURL: SILICONFLOW_BASE_URL,
-  });
+  let model: LanguageModel;
+  try {
+    model = process.env.REFINERY_MODEL === "kimi"
+      ? createAiSdkLanguageModel("kimi")
+      : createAiSdkLanguageModel("deepseek");
+  } catch (error) {
+    console.error("[Analytical Pipeline API] missing model configuration:", error);
+    return Response.json({ error: "Analytical pipeline model is not configured." }, { status: 500 });
+  }
+
+  const embeddingClient = createOpenAICompatibleClient("siliconflow");
   const ragRepository = createRagRepository(createClient(process.env.SUPABASE_URL, supabaseKey));
   const result = runRefineryPhase({
     model,

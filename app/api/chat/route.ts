@@ -1,7 +1,8 @@
-import OpenAI from "openai";
+import {
+  createOpenAICompatibleClient,
+  resolveAiProviderConfig,
+} from "@/src/modules/ai/provider-adapter";
 
-const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const CHAT_MODEL = "qwen/qwen-2.5-72b-instruct";
 const MAX_REFERENCES = 3;
 const MAX_QUERY_CHARS = 2_000;
 const MAX_REFERENCE_CHARS = 4_000;
@@ -34,12 +35,6 @@ async function readChatRequest(request: Request): Promise<ChatRequestBody | null
   } catch {
     return null;
   }
-}
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
 }
 
 function isChatReference(value: unknown): value is ChatReference {
@@ -83,27 +78,19 @@ export async function POST(request: Request) {
 
   if (references.length === 0) return jsonError("At least one reference content item is required.", 400);
 
-  let apiKey: string;
+  let model: string;
   try {
-    apiKey = getRequiredEnv("OPENROUTER_API_KEY");
+    model = resolveAiProviderConfig("openrouter").defaultModel;
   } catch (error) {
     logServerError("missing configuration", error);
     return jsonError("Chat gateway is not configured.", 500);
   }
 
   try {
-    const openai = new OpenAI({
-      apiKey,
-      baseURL: OPENROUTER_BASE_URL,
-      // ✨ 修正 1：强行注入 OpenRouter 需要的安全头
-      defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "Exocortex",
-      }
-    });
+    const openai = createOpenAICompatibleClient("openrouter");
 
     const completionStream = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model,
       messages: [
         { role: "system", content: buildSystemPrompt(references) },
         { role: "user", content: query },

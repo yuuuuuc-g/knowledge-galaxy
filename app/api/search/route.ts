@@ -1,11 +1,7 @@
-import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import { createOpenAICompatibleClient } from "@/src/modules/ai/provider-adapter";
 import { createRagRepository } from "@/src/modules/rag/repository";
 import { MAX_QUERY_CHARS, runRetrievalAgent } from "@/src/modules/retrieval/agent";
-
-const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
-const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,36 +84,24 @@ export async function POST(request: Request) {
     return jsonError("bookUuid must be a valid UUID when provided.", 400);
   }
 
-  let siliconFlowApiKey: string;
-  let geminiApiKey: string;
-  let deepSeekApiKey: string;
   let supabaseUrl: string;
   let supabaseKey: string;
+  let llmClient: ReturnType<typeof createOpenAICompatibleClient>;
+  let embeddingClient: ReturnType<typeof createOpenAICompatibleClient>;
+  let agentClient: ReturnType<typeof createOpenAICompatibleClient>;
 
   try {
-    siliconFlowApiKey = getRequiredEnv("SILICONFLOW_API_KEY");
-    geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
-    deepSeekApiKey = getRequiredEnv("DEEPSEEK_API_KEY");
     supabaseUrl = getRequiredEnv("SUPABASE_URL");
     supabaseKey = getRequiredSupabaseKey();
+    llmClient = createOpenAICompatibleClient("gemini");
+    embeddingClient = createOpenAICompatibleClient("siliconflow");
+    agentClient = createOpenAICompatibleClient("deepseek");
   } catch (error) {
     logServerError("missing configuration", error);
     return jsonError("Search gateway is not configured.", 500);
   }
 
   try {
-    const llmClient = new OpenAI({
-      apiKey: geminiApiKey,
-      baseURL: GEMINI_BASE_URL,
-    });
-    const embeddingClient = new OpenAI({
-      apiKey: siliconFlowApiKey,
-      baseURL: SILICONFLOW_BASE_URL,
-    });
-    const agentClient = new OpenAI({
-      apiKey: deepSeekApiKey,
-      baseURL: DEEPSEEK_BASE_URL,
-    });
     const ragRepository = createRagRepository(createClient(supabaseUrl, supabaseKey));
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
