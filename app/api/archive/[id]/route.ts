@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
+import {
+  ArchiveRepositoryError,
+  createArchiveRepository,
+} from "@/src/modules/archive/repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,16 +25,15 @@ export async function DELETE(_request: Request, context: ArchiveDocumentRouteCon
   }
 
   try {
-    const supabase = createSupabaseAdmin();
-    const { error } = await supabase.from("documents").delete().eq("id", id);
-
-    if (error) {
-      console.error("[Archive API] delete failed:", error);
-      return NextResponse.json({ error: "Unable to delete archive document." }, { status: 502 });
-    }
+    const repository = createArchiveRepository(createSupabaseAdmin());
+    await repository.deleteDocument(id);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof ArchiveRepositoryError) {
+      console.error("[Archive API] repository delete failed:", error.message);
+      return NextResponse.json({ error: error.publicMessage }, { status: error.status });
+    }
     console.error("[Archive API] delete request failed:", error);
     return NextResponse.json({ error: "Archive gateway is not configured." }, { status: 500 });
   }

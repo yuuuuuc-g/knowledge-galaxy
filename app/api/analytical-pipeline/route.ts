@@ -3,7 +3,8 @@ import { stepCountIs, streamText, tool } from "ai";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { HybridSearchRpcClient, runLocalHybridSearch } from "@/src/lib/local-search";
+import { runLocalHybridSearch } from "@/src/lib/local-search";
+import { createRagRepository } from "@/src/modules/rag/repository";
 
 interface RefineryRequestBody {
   prompt?: unknown;
@@ -176,7 +177,7 @@ export async function POST(request: Request) {
     apiKey: process.env.SILICONFLOW_API_KEY,
     baseURL: SILICONFLOW_BASE_URL,
   });
-  const supabase = createClient(process.env.SUPABASE_URL, supabaseKey) as unknown as HybridSearchRpcClient;
+  const ragRepository = createRagRepository(createClient(process.env.SUPABASE_URL, supabaseKey));
   const systemPrompt = phase === "D" && topicTitle
     ? buildPhaseDPrompt(topicTitle)
     : PHASE_PROMPTS[phase];
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
         }),
         execute: async (input) => {
           const results = await runLocalHybridSearch({
-            supabase,
+            repository: ragRepository,
             embeddingClient,
             query: input.query.trim(),
             matchCount: input.match_count ?? 3,

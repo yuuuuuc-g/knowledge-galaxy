@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { Json } from "@/src/lib/database.types";
 import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
+import {
+  ArchiveRepositoryError,
+  createArchiveRepository,
+} from "@/src/modules/archive/repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,98 +75,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const supabase = createSupabaseAdmin();
-
-    if (selectedTopicId) {
-      const { data: existingDoc, error: fetchError } = await supabase
-        .from("documents")
-        .select("id, content_markdown")
-        .eq("topic_id", selectedTopicId)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error("[Analytical Archive API] fetch document failed:", fetchError);
-        return NextResponse.json({ error: "Unable to load topic document." }, { status: 502 });
-      }
-
-      if (!existingDoc) {
-        return NextResponse.json(
-          { error: "No existing document found for the selected topic." },
-          { status: 404 }
-        );
-      }
-
-      const updatedContent = `${existingDoc.content_markdown}\n\n---\n\n${content}`;
-      const { data: document, error: updateError } = await supabase
-        .from("documents")
-        .update({ content_markdown: updatedContent })
-        .eq("id", existingDoc.id)
-        .eq("topic_id", selectedTopicId)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error("[Analytical Archive API] update document failed:", updateError);
-        return NextResponse.json({ error: "Unable to update topic document." }, { status: 502 });
-      }
-
-      const { error: sessionError } = await supabase.from("analytical_sessions").insert({
-        document_id: existingDoc.id,
-        source_issue: sourceText,
-        phases,
-      });
-
-      if (sessionError) {
-        console.error("[Analytical Archive API] insert session failed:", sessionError);
-        return NextResponse.json({ error: "Unable to record analytical session." }, { status: 502 });
-      }
-
-      return NextResponse.json({ document, topic: null, mode: "append" });
-    }
-
-    const topicTitle = sourceText.slice(0, 100) || "Untitled Topic";
-    const { data: topic, error: topicError } = await supabase
-      .from("topics")
-      .insert({ title: topicTitle, description: null })
-      .select()
-      .single();
-
-    if (topicError || !topic) {
-      console.error("[Analytical Archive API] insert topic failed:", topicError);
-      return NextResponse.json({ error: "Unable to create topic." }, { status: 502 });
-    }
-
-    const { data: document, error: docError } = await supabase
-      .from("documents")
-      .insert({
-        title: sourceText.slice(0, 50) || "Untitled Analysis",
-        content_markdown: content,
-        source_module: "analytical-pipeline",
-        topic_id: topic.id,
-      })
-      .select()
-      .single();
-
-    if (docError || !document) {
-      console.error("[Analytical Archive API] insert document failed:", docError);
-      return NextResponse.json({ error: "Unable to create archive document." }, { status: 502 });
-    }
-
-    const { error: sessionError } = await supabase.from("analytical_sessions").insert({
-      document_id: document.id,
-      source_issue: sourceText,
+    const repository = createArchiveRepository(createSupabaseAdmin());
+    const result = await repository.persistAnalyticalArchive({
+      content,
+      sourceText,
+      selectedTopicId: selectedTopicId || undefined,
       phases,
     });
 
-    if (sessionError) {
-      console.error("[Analytical Archive API] insert session failed:", sessionError);
-      return NextResponse.json({ error: "Unable to record analytical session." }, { status: 502 });
-    }
-
-    return NextResponse.json({ document, topic, mode: "create" });
+    return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof ArchiveRepositoryError) {
+      console.error("[Analytical Archive API] repository failed:", error.message);
+      return NextResponse.json({ error: error.publicMessage }, { status: error.status });
+    }
     console.error("[Analytical Archive API] request failed:", error);
     return NextResponse.json({ error: "Analytical archive gateway is not configured." }, { status: 500 });
   }

@@ -2,16 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { NexusGraphCanvas } from "./NexusGraphCanvas";
 import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
-import type { Database, Json } from "@/src/lib/database.types";
+import type { Json } from "@/src/lib/database.types";
+import {
+  createArchiveRepository,
+  type ArchiveDocumentWithSessions,
+} from "@/src/modules/archive/repository";
 import type { NexusGraphData, NexusLink, NexusNode } from "./types";
 
-type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
-type AnalyticalSessionRow =
-  Database["public"]["Tables"]["analytical_sessions"]["Row"];
-
-interface DocumentWithSessions extends DocumentRow {
-  analytical_sessions: AnalyticalSessionRow[];
-}
+type DocumentWithSessions = ArchiveDocumentWithSessions;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -129,17 +127,10 @@ export default async function KnowledgeGraphPage({
 }: KnowledgeGraphPageProps) {
   const resolvedSearchParams = await searchParams;
   const isEmbedded = resolvedSearchParams?.embed === "1";
-  const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*, analytical_sessions(*)")
-    .order("created_at", { ascending: false });
+  const repository = createArchiveRepository(createSupabaseAdmin());
+  const data = await repository.listDocumentsWithSessions();
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const graphData = buildNexusGraph((data ?? []) as DocumentWithSessions[]);
+  const graphData = buildNexusGraph(data);
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white">

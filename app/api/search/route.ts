@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
-import { HybridSearchRpcClient, SearchResult, runLocalHybridSearch } from "@/src/lib/local-search";
+import { SearchResult, runLocalHybridSearch } from "@/src/lib/local-search";
+import { createRagRepository } from "@/src/modules/rag/repository";
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
@@ -28,15 +29,6 @@ interface SearchRequestBody {
 
 interface SearchResponseBody {
   results: SearchResult[];
-}
-
-interface SearchResultCitation {
-  id: string;
-  chapter_title: string;
-  similarity: number;
-  chapter_index: number | null;
-  chunk_index: number | null;
-  preview: string;
 }
 
 type AgentSystemMessage = {
@@ -130,22 +122,6 @@ function isUuid(value: string): boolean {
 
 function toSseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
-
-function toCitationPreview(content: string): string {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  return normalized.length <= 180 ? normalized : `${normalized.slice(0, 177).trim()}...`;
-}
-
-function sanitizeSearchResults(results: SearchResult[]): SearchResultCitation[] {
-  return results.map((result) => ({
-    id: result.id,
-    chapter_title: result.chapter_title,
-    similarity: result.similarity,
-    chapter_index: result.chapter_index,
-    chunk_index: result.chunk_index,
-    preview: toCitationPreview(result.content),
-  }));
 }
 
 function parseHybridSearchToolArgs(rawArguments: string): {
@@ -261,7 +237,7 @@ export async function POST(request: Request) {
       apiKey: deepSeekApiKey,
       baseURL: DEEPSEEK_BASE_URL,
     });
-    const supabase = createClient(supabaseUrl, supabaseKey) as unknown as HybridSearchRpcClient;
+    const ragRepository = createRagRepository(createClient(supabaseUrl, supabaseKey));
     const rewrittenQuery = await rewriteQuery(llmClient, query);
     logQueryRewrite(query, rewrittenQuery);
     const encoder = new TextEncoder();
@@ -360,7 +336,7 @@ export async function POST(request: Request) {
                   });
 
                   const results = await runLocalHybridSearch({
-                    supabase,
+                    repository: ragRepository,
                     embeddingClient,
                     query: queryForTool,
                     matchCount: parsedArgs.matchCount,
@@ -372,7 +348,7 @@ export async function POST(request: Request) {
                   sendEvent("tool_call_result", {
                     iteration,
                     toolCallId: toolCall.id,
-                    results: sanitizeSearchResults(results),
+                    results: ragRepository.toSearchResultCitations(results),
                     retrievedChunks: results.length,
                   });
 
@@ -414,7 +390,7 @@ export async function POST(request: Request) {
               });
               sendEvent("agent_finished", {
                 answer: guardedAnswer,
-                results: sanitizeSearchResults(latestResults),
+                results: ragRepository.toSearchResultCitations(latestResults),
                 totalIterations: iteration,
               });
               controller.close();
