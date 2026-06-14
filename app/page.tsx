@@ -18,6 +18,10 @@ import { MacroIntelConsole } from "@/src/components/hud/MacroIntelConsole";
 import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
 import { useSolarStore } from "@/src/store/solarStore";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
+import {
+  createCanvasRuntimeProfile,
+  type CanvasRuntimeProfile,
+} from "@/src/modules/canvas/runtime-controller";
 
 type ActiveSystem =
   | "analytical-pipeline"
@@ -64,15 +68,17 @@ interface SceneProps {
   hasFocusedPlanet: boolean;
   orbitTarget: [number, number, number];
   onSunClick: () => void;
+  runtime: CanvasRuntimeProfile;
 }
 
-const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
+const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick, runtime }: SceneProps) => {
   useDevRenderCounter("Home::MemoizedScene");
   return (
     <Canvas
       className="z-0"
       camera={{ position: [0, 8, 40], fov: 45 }}
-      dpr={[1, 1.5]}
+      dpr={runtime.dpr}
+      frameloop={runtime.frameloop}
       gl={{
         antialias: false,
         powerPreference: "high-performance",
@@ -87,10 +93,12 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
         });
       }}
     >
-      <Environment
-        background
-        files="/textures/8k_stars_milky_way.jpg"
-      />
+      {runtime.environmentEnabled && (
+        <Environment
+          background
+          files="/textures/8k_stars_milky_way.jpg"
+        />
+      )}
 
       <ambientLight intensity={0.6} />
       <directionalLight
@@ -107,20 +115,22 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
         target={orbitTarget}
       />
 
-      <Stars
-        radius={50}
-        depth={50}
-        count={100}
-        factor={4}
-        saturation={0}
-        fade
-        speed={1}
-      />
+      {runtime.starsEnabled && (
+        <Stars
+          radius={50}
+          depth={50}
+          count={100}
+          factor={4}
+          saturation={0}
+          fade
+          speed={1}
+        />
+      )}
 
       <CameraController />
       <CoreStar onSunClick={onSunClick} />
       <SolarSystem />
-      <SolarBloom />
+      {runtime.bloomEnabled && <SolarBloom />}
     </Canvas>
   );
 };
@@ -135,6 +145,18 @@ export default function Home() {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [activeSystem, setActiveSystem] = useState<ActiveSystem>(null);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
+  const deviceMemoryGb =
+    typeof navigator !== "undefined" && "deviceMemory" in navigator
+      ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory)
+      : undefined;
+  const canvasRuntime = useMemo(
+    () =>
+      createCanvasRuntimeProfile({
+        overlayActive: isConsoleOpen || activeSystem !== null,
+        deviceMemoryGb,
+      }),
+    [activeSystem, deviceMemoryGb, isConsoleOpen]
+  );
 
   const handleContextLost = useCallback((event: Event) => {
     event.preventDefault();
@@ -263,6 +285,7 @@ export default function Home() {
         hasFocusedPlanet={focusedPlanet !== null}
         orbitTarget={orbitTarget}
         onSunClick={handleSunClick}
+        runtime={canvasRuntime}
       />
 
       {!activeSystem && (
