@@ -1,11 +1,23 @@
-import OpenAI from "openai";
 import type { RagRepository, RagSearchResult } from "@/src/modules/rag/repository";
 
 export const EMBEDDING_MODEL = "BAAI/bge-m3";
 
 export type SearchResult = RagSearchResult;
 
-async function createQueryEmbedding(embeddingClient: OpenAI, query: string): Promise<number[]> {
+export interface EmbeddingClient {
+  embeddings: {
+    create(input: { model: string; input: string }): Promise<{
+      data: Array<{
+        embedding?: number[];
+      }>;
+    }>;
+  };
+}
+
+async function createQueryEmbedding(
+  embeddingClient: EmbeddingClient,
+  query: string
+): Promise<number[]> {
   const embeddingResponse = await embeddingClient.embeddings.create({
     model: EMBEDDING_MODEL,
     input: query,
@@ -21,7 +33,7 @@ async function createQueryEmbedding(embeddingClient: OpenAI, query: string): Pro
 
 export async function runLocalHybridSearch(params: {
   repository: Pick<RagRepository, "searchChunks">;
-  embeddingClient: OpenAI;
+  embeddingClient: EmbeddingClient;
   query: string;
   matchCount: number;
   bookUuid?: string;
