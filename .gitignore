@@ -77,9 +77,19 @@ __pycache__/
 # ─────────────────────────────────────────────
 # 11. Local RAG Artifacts
 # ─────────────────────────────────────────────
+data/
+rag-pipeline/*.epub
 rag-pipeline/*.epub/
 
 # ─────────────────────────────────────────────
-# 12. Misc
+# 12. Local Agent/Scratch State
+# ─────────────────────────────────────────────
+.scratch/
+.sisyphus/run-continuation/
+
+# ─────────────────────────────────────────────
+# 13. Misc
 # ─────────────────────────────────────────────
 ctx2skill-loop.ts
+/next
+/knowledge-galaxy@*

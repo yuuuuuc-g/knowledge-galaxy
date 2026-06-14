@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "node_modules/**",
+    ".venv/**",
+    "__pycache__/**",
+    ".ruff_cache/**",
+    "data/**",
+    "rag-pipeline/**",
+    ".scratch/**",
+    ".sisyphus/run-continuation/**",
   ]),
 ]);
 

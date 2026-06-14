@@ -165,8 +165,10 @@ export default function Home() {
       ((activeSystem === "saturn" && focusedPlanet?.name !== "Saturn") ||
         (activeSystem === "macro-intel" && focusedPlanet?.name !== "Uranus"))
     ) {
-      setActiveSystem(null);
+      const timer = window.setTimeout(() => setActiveSystem(null), 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [activeSystem, focusedPlanet?.name]);
 
   useEffect(() => {
@@ -241,11 +243,14 @@ export default function Home() {
     const system = new URLSearchParams(window.location.search).get("system");
     if (system !== "archive") return;
 
-    const earth = PLANETS.find((planet) => planet.name === "Earth");
-    if (earth) {
-      setFocusedPlanet(earth);
-    }
-    setActiveSystem("archive");
+    const timer = window.setTimeout(() => {
+      const earth = PLANETS.find((planet) => planet.name === "Earth");
+      if (earth) {
+        setFocusedPlanet(earth);
+      }
+      setActiveSystem("archive");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [setFocusedPlanet]);
 
   return (

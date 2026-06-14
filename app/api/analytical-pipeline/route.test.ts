@@ -81,6 +81,7 @@ describe("POST /api/analytical-pipeline", () => {
     process.env.SILICONFLOW_API_KEY = "siliconflow-key";
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_KEY = "supabase-key";
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.REFINERY_MODEL;
   });
 

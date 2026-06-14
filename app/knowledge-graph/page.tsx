@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { NexusGraphCanvas } from "./NexusGraphCanvas";
-import { createServerSupabase } from "@/src/lib/supabase/server";
+import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
 import type { Database, Json } from "@/src/lib/database.types";
 import type { NexusGraphData, NexusLink, NexusNode } from "./types";
 
@@ -129,7 +129,7 @@ export default async function KnowledgeGraphPage({
 }: KnowledgeGraphPageProps) {
   const resolvedSearchParams = await searchParams;
   const isEmbedded = resolvedSearchParams?.embed === "1";
-  const supabase = await createServerSupabase();
+  const supabase = createSupabaseAdmin();
   const { data, error } = await supabase
     .from("documents")
     .select("*, analytical_sessions(*)")

@@ -15,6 +15,8 @@ interface RefineryRequestBody {
 type RefineryPhase = "A" | "B" | "C" | "D";
 
 const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
+const MAX_PROMPT_CHARS = 4_000;
+const MAX_TOPIC_TITLE_CHARS = 200;
 const MARS_SYSTEM_PROMPT = `你是一个顶级的跨国政经商业智库引擎 (Exocortex Crucible)。
 你的核心任务是抹平不同地域（如拉美西语区与大中华区）在政治体制、宏观经济、文化习俗上的信息不对称。
 在开始构建简报前，你【必须】优先调用本地知识库检索工具，寻找学者原典或官方政策作为分析的绝对基石。如果本地无记录，才允许使用原生知识 Fallback。
@@ -107,11 +109,37 @@ function isUuid(value: string): boolean {
   );
 }
 
+function getRequiredSupabaseKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_KEY ?? "";
+}
+
+async function readRefineryRequest(request: Request): Promise<RefineryRequestBody | null> {
+  try {
+    const body = (await request.json()) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return null;
+    }
+    return body;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
-  const body = (await request.json()) as RefineryRequestBody;
+  const body = await readRefineryRequest(request);
+  if (!body) {
+    return Response.json({ error: "Request body must be a JSON object." }, { status: 400 });
+  }
   const prompt = body.prompt;
   const phase = isRefineryPhase(body.phase) ? body.phase : "A";
-  const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle : undefined;
+  const topicTitleCandidate = typeof body.topicTitle === "string" ? body.topicTitle.trim() : "";
+  if (topicTitleCandidate.length > MAX_TOPIC_TITLE_CHARS) {
+    return Response.json(
+      { error: `topicTitle must be ${MAX_TOPIC_TITLE_CHARS} characters or fewer.` },
+      { status: 413 }
+    );
+  }
+  const topicTitle = topicTitleCandidate.length > 0 ? topicTitleCandidate : undefined;
   const rawBookUuid = body.bookUuid;
   if (rawBookUuid !== undefined && typeof rawBookUuid !== "string") {
     return Response.json({ error: "bookUuid must be a string when provided." }, { status: 400 });
@@ -128,10 +156,18 @@ export async function POST(request: Request) {
   if (typeof prompt !== "string" || prompt.trim().length === 0) {
     return Response.json({ error: "A non-empty prompt string is required." }, { status: 400 });
   }
-
-  if (!process.env.SILICONFLOW_API_KEY || !process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+  const trimmedPrompt = prompt.trim();
+  if (trimmedPrompt.length > MAX_PROMPT_CHARS) {
     return Response.json(
-      { error: "Missing required environment variables for local knowledge retrieval." },
+      { error: `Prompt must be ${MAX_PROMPT_CHARS} characters or fewer.` },
+      { status: 413 }
+    );
+  }
+
+  const supabaseKey = getRequiredSupabaseKey();
+  if (!process.env.SILICONFLOW_API_KEY || !process.env.SUPABASE_URL || !supabaseKey) {
+    return Response.json(
+      { error: "Local knowledge retrieval is not configured." },
       { status: 500 }
     );
   }
@@ -140,7 +176,7 @@ export async function POST(request: Request) {
     apiKey: process.env.SILICONFLOW_API_KEY,
     baseURL: SILICONFLOW_BASE_URL,
   });
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY) as unknown as HybridSearchRpcClient;
+  const supabase = createClient(process.env.SUPABASE_URL, supabaseKey) as unknown as HybridSearchRpcClient;
   const systemPrompt = phase === "D" && topicTitle
     ? buildPhaseDPrompt(topicTitle)
     : PHASE_PROMPTS[phase];
@@ -149,7 +185,7 @@ export async function POST(request: Request) {
     stopWhen: stepCountIs(5),
     model,
     system: systemPrompt,
-    prompt: prompt.trim(),
+    prompt: trimmedPrompt,
     temperature: 0.35,
     tools: {
       search_local_knowledge_base: tool({

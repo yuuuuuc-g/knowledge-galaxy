@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { createClient } from "@/src/lib/supabase/client";
 import { downloadAllDocumentsAsJson } from "@/src/lib/export-utils";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
 import type { Database } from "@/src/lib/database.types";
@@ -22,20 +21,34 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadDocuments() {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("documents")
-        .select("*")
-        .order("created_at", { ascending: false });
+    let active = true;
 
-      if (!error && data) {
-        setDocuments(data);
+    async function loadDocuments() {
+      try {
+        const response = await fetch("/api/archive", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Unable to load archive documents.");
+        }
+        const payload = (await response.json()) as { documents?: Document[] };
+        if (active) {
+          setDocuments(Array.isArray(payload.documents) ? payload.documents : []);
+        }
+      } catch (error) {
+        console.error("[ArchivePanel] load failed:", error);
+        if (active) {
+          setDocuments([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     }
 
     loadDocuments();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleDocumentClick = (id: string) => {
@@ -48,25 +61,11 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
     }
 
     setDeletingId(id);
-    const supabase = createClient();
-
-    const { error: sessionError } = await supabase
-      .from("analytical_sessions")
-      .delete()
-      .eq("document_id", id);
-
-    if (sessionError) {
-      setDeletingId(null);
-      return;
-    }
-
-    const { error: documentError } = await supabase
-      .from("documents")
-      .delete()
-      .eq("id", id);
-
-    if (!documentError) {
+    const response = await fetch(`/api/archive/${id}`, { method: "DELETE" });
+    if (response.ok) {
       setDocuments((current) => current.filter((doc) => doc.id !== id));
+    } else {
+      console.error("[ArchivePanel] delete failed:", await response.text());
     }
 
     setDeletingId(null);

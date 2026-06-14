@@ -19,8 +19,8 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 const RSS_SOURCES: { name: string; url: string }[] = [
-  { name: "BBC World", url: "http://feeds.bbci.co.uk/news/world/rss.xml" },
-  { name: "BBC Business", url: "http://feeds.bbci.co.uk/news/business/rss.xml" },
+  { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
+  { name: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
   { name: "The Guardian World", url: "https://www.theguardian.com/world/rss" },
   { name: "NYT World", url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml" },
   { name: "NYT Business", url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml" },
@@ -90,9 +90,10 @@ async function fetchOneFeed(
   parser: Parser,
   source: { name: string; url: string }
 ): Promise<RawHeadline[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RSS_TIMEOUT_MS);
+
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), RSS_TIMEOUT_MS);
     const response = await fetch(source.url, {
       signal: controller.signal,
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ExocortexSaturnRadar/1.0; +https://exocortex.local)" },
@@ -100,7 +101,6 @@ async function fetchOneFeed(
       // @ts-expect-error - undici dispatcher is supported by Node fetch but not in lib.dom types
       dispatcher: ipv4OnlyAgent,
     });
-    clearTimeout(timer);
 
     if (!response.ok) {
       console.warn(`[Saturn] feed ${source.name} returned ${response.status}`);
@@ -131,6 +131,8 @@ async function fetchOneFeed(
   } catch (error) {
     console.warn(`[Saturn] feed ${source.name} failed`, error);
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -205,8 +207,6 @@ export async function GET(request: Request) {
       return Response.json(
         {
           error: "AI returned JSON that failed schema validation.",
-          detail: parsed.error.message,
-          raw: rawText,
         },
         { status: 502 }
       );
@@ -215,7 +215,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("[Saturn] AI editor extraction failed", error);
     return Response.json(
-      { error: "AI editor extraction failed", detail: String(error) },
+      { error: "AI editor extraction failed" },
       { status: 502 }
     );
   }
@@ -227,7 +227,6 @@ export async function GET(request: Request) {
     return Response.json(
       {
         error: "AI returned items but none matched the source URL whitelist.",
-        candidates: selected,
       },
       { status: 502 }
     );
@@ -254,7 +253,7 @@ export async function GET(request: Request) {
   if (insertError) {
     console.error("[Saturn] Supabase upsert failed", insertError);
     return Response.json(
-      { error: "Supabase upsert failed", detail: insertError.message },
+      { error: "Supabase upsert failed" },
       { status: 500 }
     );
   }

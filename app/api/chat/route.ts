@@ -3,6 +3,8 @@ import OpenAI from "openai";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const CHAT_MODEL = "qwen/qwen-2.5-72b-instruct";
 const MAX_REFERENCES = 3;
+const MAX_QUERY_CHARS = 2_000;
+const MAX_REFERENCE_CHARS = 4_000;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,10 @@ interface ChatRequestBody {
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
+}
+
+function logServerError(context: string, error: unknown) {
+  console.error(`[Chat API] ${context}:`, error);
 }
 
 async function readChatRequest(request: Request): Promise<ChatRequestBody | null> {
@@ -39,7 +45,11 @@ function getRequiredEnv(name: string): string {
 function isChatReference(value: unknown): value is ChatReference {
   if (!value || typeof value !== "object") return false;
   const row = value as Partial<ChatReference>;
-  return typeof row.content === "string" && row.content.trim().length > 0;
+  return (
+    typeof row.content === "string" &&
+    row.content.trim().length > 0 &&
+    row.content.trim().length <= MAX_REFERENCE_CHARS
+  );
 }
 
 function buildSystemPrompt(references: ChatReference[]): string {
@@ -63,6 +73,9 @@ export async function POST(request: Request) {
   const query = typeof body?.query === "string" ? body.query.trim() : "";
 
   if (!query) return jsonError("A non-empty query string is required.", 400);
+  if (query.length > MAX_QUERY_CHARS) {
+    return jsonError(`Query must be ${MAX_QUERY_CHARS} characters or fewer.`, 413);
+  }
 
   const references = Array.isArray(body?.references)
     ? body.references.filter(isChatReference).slice(0, MAX_REFERENCES)
@@ -74,8 +87,8 @@ export async function POST(request: Request) {
   try {
     apiKey = getRequiredEnv("OPENROUTER_API_KEY");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Chat gateway is not configured.";
-    return jsonError(message, 500);
+    logServerError("missing configuration", error);
+    return jsonError("Chat gateway is not configured.", 500);
   }
 
   try {
@@ -124,9 +137,7 @@ export async function POST(request: Request) {
       status: 200,
     });
   } catch (error) {
-    // ✨ 核心修正 3：打印真正的死因！
-    console.error("\n🚨 [大模型 API 阻击日志]:", error);
-    const message = error instanceof Error ? error.message : "Chat request failed.";
-    return jsonError(message, 502);
+    logServerError("provider request failed", error);
+    return jsonError("Chat request failed.", 502);
   }
 }

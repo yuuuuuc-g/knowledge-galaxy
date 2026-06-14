@@ -116,6 +116,7 @@ describe("POST /api/search", () => {
     process.env.DEEPSEEK_API_KEY = "deepseek-key";
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_KEY = "supabase-key";
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   });
 
   it("rejects an empty query before starting the agent", async () => {
@@ -205,9 +206,10 @@ describe("POST /api/search", () => {
       "agent_finished",
     ]);
     expect(events[2]?.data.results).toMatchObject([
-      { id: "chunk-1", chapter_title: "制度与合作" },
-      { id: "chunk-2", chapter_title: "分工" },
+      { id: "chunk-1", chapter_title: "制度与合作", preview: "规则降低交易成本。" },
+      { id: "chunk-2", chapter_title: "分工", preview: "专业化依赖可预期规则。" },
     ]);
+    expect(JSON.stringify(events[2]?.data.results)).not.toContain("content");
     expect(events[4]?.data.delta).toBe("制度通过降低不确定性促进合作。");
     expect(mocks.rpc).toHaveBeenCalledWith("hybrid_search", {
       query_text: "制度经济学",

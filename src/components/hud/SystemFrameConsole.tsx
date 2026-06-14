@@ -35,7 +35,9 @@ export function SystemFrameConsole({
           role="dialog"
         >
           <motion.div
-            className={`relative flex h-[88vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border bg-black/80 shadow-[0_0_80px_rgba(34,211,238,0.14)] backdrop-blur-xl ${borderClassName}`}
+            className={`relative flex flex-col overflow-hidden rounded-2xl border bg-black/80 shadow-[0_0_80px_rgba(34,211,238,0.14)] backdrop-blur-xl ${
+              fullBleed ? "h-[94vh] w-[96vw]" : "h-[88vh] w-[1180px] max-w-[96vw]"
+            } ${borderClassName}`}
             initial={{ opacity: 0, y: 16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}

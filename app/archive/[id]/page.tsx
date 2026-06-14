@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArchiveBackButton } from "./ArchiveBackButton";
 import { ArchiveExportActions } from "@/src/components/hud/ArchiveExportActions";
-import { createServerSupabase } from "@/src/lib/supabase/server";
+import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
 import type { Database } from "@/src/lib/database.types";
 
 type Document = Database["public"]["Tables"]["documents"]["Row"];
@@ -46,7 +46,7 @@ function extractKeywords(phases: AnalyticalSession["phases"]): string[] {
 
 export default async function ArchivePage({ params }: ArchivePageProps) {
   const { id } = await params;
-  const supabase = await createServerSupabase();
+  const supabase = createSupabaseAdmin();
 
   const { data } = await supabase
     .from("documents")

@@ -11,6 +11,7 @@ const MATCH_COUNT = 3;
 const MAX_AGENT_ITERATIONS = 4;
 const QUERY_REWRITE_TIMEOUT_MS = 4_000;
 const AGENT_ITERATION_TIMEOUT_MS = 15_000;
+const MAX_QUERY_CHARS = 2_000;
 const QUERY_REWRITE_SYSTEM_PROMPT =
   "你是一个专业的经济学与政治哲学搜索引擎的提示词工程师。你的任务是提取用户提问的核心概念，并扩充相关的学术同义词、英文专有名词。请直接输出扩充后的搜索词，不要包含任何解释、标点或聊天废话。例如，用户输入'游戏规则'，你输出'游戏规则 Rules of the game 制度 Institutions 产权'。";
 const AGENT_SYSTEM_PROMPT = `你是一个绝对纯粹的本地文献学者。你必须且只能使用 search_knowledge_base 工具来回答问题。
@@ -27,6 +28,15 @@ interface SearchRequestBody {
 
 interface SearchResponseBody {
   results: SearchResult[];
+}
+
+interface SearchResultCitation {
+  id: string;
+  chapter_title: string;
+  similarity: number;
+  chapter_index: number | null;
+  chunk_index: number | null;
+  preview: string;
 }
 
 type AgentSystemMessage = {
@@ -80,6 +90,10 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
+function logServerError(context: string, error: unknown): void {
+  console.error(`[Search API] ${context}:`, error);
+}
+
 async function readSearchRequest(request: Request): Promise<SearchRequestBody | null> {
   try {
     const body = (await request.json()) as unknown;
@@ -104,6 +118,10 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function getRequiredSupabaseKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? getRequiredEnv("SUPABASE_KEY");
+}
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
@@ -112,6 +130,22 @@ function isUuid(value: string): boolean {
 
 function toSseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function toCitationPreview(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  return normalized.length <= 180 ? normalized : `${normalized.slice(0, 177).trim()}...`;
+}
+
+function sanitizeSearchResults(results: SearchResult[]): SearchResultCitation[] {
+  return results.map((result) => ({
+    id: result.id,
+    chapter_title: result.chapter_title,
+    similarity: result.similarity,
+    chapter_index: result.chapter_index,
+    chunk_index: result.chunk_index,
+    preview: toCitationPreview(result.content),
+  }));
 }
 
 function parseHybridSearchToolArgs(rawArguments: string): {
@@ -183,6 +217,9 @@ export async function POST(request: Request) {
   if (!query) {
     return jsonError("A non-empty query string is required.", 400);
   }
+  if (query.length > MAX_QUERY_CHARS) {
+    return jsonError(`Query must be ${MAX_QUERY_CHARS} characters or fewer.`, 413);
+  }
 
   if (rawBookUuid !== undefined && typeof rawBookUuid !== "string") {
     return jsonError("bookUuid must be a string when provided.", 400);
@@ -205,10 +242,10 @@ export async function POST(request: Request) {
     geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
     deepSeekApiKey = getRequiredEnv("DEEPSEEK_API_KEY");
     supabaseUrl = getRequiredEnv("SUPABASE_URL");
-    supabaseKey = getRequiredEnv("SUPABASE_KEY");
+    supabaseKey = getRequiredSupabaseKey();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Search gateway is not configured.";
-    return jsonError(message, 500);
+    logServerError("missing configuration", error);
+    return jsonError("Search gateway is not configured.", 500);
   }
 
   try {
@@ -310,6 +347,9 @@ export async function POST(request: Request) {
 
                   const parsedArgs = parseHybridSearchToolArgs(toolCall.function.arguments);
                   const queryForTool = parsedArgs.queryOverride ?? rewrittenQuery;
+                  if (queryForTool.length > MAX_QUERY_CHARS) {
+                    throw new Error("Tool query exceeded the maximum allowed length.");
+                  }
 
                   sendEvent("tool_call_started", {
                     iteration,
@@ -332,7 +372,7 @@ export async function POST(request: Request) {
                   sendEvent("tool_call_result", {
                     iteration,
                     toolCallId: toolCall.id,
-                    results,
+                    results: sanitizeSearchResults(results),
                     retrievedChunks: results.length,
                   });
 
@@ -374,7 +414,7 @@ export async function POST(request: Request) {
               });
               sendEvent("agent_finished", {
                 answer: guardedAnswer,
-                results: latestResults,
+                results: sanitizeSearchResults(latestResults),
                 totalIterations: iteration,
               });
               controller.close();
@@ -390,10 +430,10 @@ export async function POST(request: Request) {
           });
           controller.close();
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Search request failed.";
+          logServerError("stream failed", error);
           sendEvent("agent_failed", {
             reason: "runtime_error",
-            message,
+            message: "Search request failed.",
           });
           controller.close();
         }
@@ -409,8 +449,7 @@ export async function POST(request: Request) {
       status: 200,
     });
   } catch (error) {
-    console.error("\n🚨 [代码层崩溃捕获]:", error, "\n"); // ✨ 新增错误堆栈打印
-    const message = error instanceof Error ? error.message : "Search request failed.";
-    return jsonError(message, 500);
+    logServerError("request failed", error);
+    return jsonError("Search request failed.", 500);
   }
 }

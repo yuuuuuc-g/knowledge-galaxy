@@ -7,10 +7,14 @@ export function proxy(req: NextRequest) {
   // 使用方括号语法，强制运行时读取，防止 Webpack 静态替换
   const expectedPassword = process.env['SITE_PASSWORD'];
 
-  // 如果云端确实没有配置环境变量，仅在后台静默警告，防止业务死锁
   if (!expectedPassword) {
-    console.warn("⚠️ [Auth Proxy]: SITE_PASSWORD is not set. Bypassing authentication.");
-    return NextResponse.next();
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("⚠️ [Auth Proxy]: SITE_PASSWORD is not set. Bypassing authentication in development.");
+      return NextResponse.next();
+    }
+
+    console.error("🚨 [Auth Proxy]: SITE_PASSWORD is not set in production. Blocking request.");
+    return new NextResponse('Authentication is not configured', { status: 500 });
   }
 
   if (basicAuth) {
@@ -27,7 +31,7 @@ export function proxy(req: NextRequest) {
           return NextResponse.next();
         }
       }
-    } catch (error) {
+    } catch {
       // 解析异常静默处理，直接放行至下方的 401 拦截
     }
   }

@@ -12,7 +12,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
-import { createClient } from "@/src/lib/supabase/client";
 
 type RefineryPhase = "A" | "B" | "C" | "D";
 type WorkbenchView = "cards" | "tags" | "editor";
@@ -26,6 +25,8 @@ interface Topic {
   id: string;
   title: string;
   description: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const phaseOrder: RefineryPhase[] = ["A", "B", "C", "D"];
@@ -360,41 +361,34 @@ export default function RefineryPage() {
   }, [draftD, completion]);
 
   useEffect(() => {
+    let active = true;
+
     async function fetchTopics() {
       console.log("[Topics] Starting to load topics...");
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("topics")
-          .select("id, title, description")
-          .order("updated_at", { ascending: false });
-
-        if (error) {
-          console.error("[Topics] Failed to load topics:", error);
-          console.error("[Topics] 加载议题失败详情:", {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-          return;
+        const response = await fetch("/api/topics", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Unable to load topics.");
         }
-
-        if (data) {
-          console.log("[Topics] Successfully loaded topics:", data.length, data);
-          setTopics(data);
-        } else {
-          console.warn("[Topics] No data returned from topics query");
-          setTopics([]);
+        const payload = (await response.json()) as { topics?: Topic[] };
+        if (active) {
+          const nextTopics = Array.isArray(payload.topics) ? payload.topics : [];
+          console.log("[Topics] Successfully loaded topics:", nextTopics.length, nextTopics);
+          setTopics(nextTopics);
         }
       } catch (error) {
         console.error("[Topics] Unexpected error while loading topics:", error);
       } finally {
-        setTopicsLoading(false);
+        if (active) {
+          setTopicsLoading(false);
+        }
       }
     }
 
     fetchTopics();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const phaseHasVisibleWorkbenchOutput =
@@ -427,163 +421,43 @@ export default function RefineryPage() {
     setSaveStatus("saving");
     setSaveError(null);
 
-    const supabase = createClient();
-    const failPersist = (message: string, error?: { message?: string; code?: string; details?: string; hint?: string }) => {
-      if (error) {
-        console.error("写入失败详情:", error);
-        console.error("[Persist] Error details:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-      } else {
-        console.error("[Persist]", message);
-      }
-
+    const failPersist = (message: string) => {
+      console.error("[Persist]", message);
       setSaveStatus("error");
-      setSaveError(error?.message ? `${message}: ${error.message}` : message);
+      setSaveError(message);
     };
 
     try {
-      if (selectedTopicId) {
-        console.log("[Persist] APPEND MODE — selectedTopicId:", selectedTopicId);
-        const { data: existingDoc, error: fetchError } = await supabase
-          .from("documents")
-          .select("id, content_markdown")
-          .eq("topic_id", selectedTopicId)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (fetchError) {
-          failPersist("Fetch document failed", fetchError);
-          return;
-        }
-
-        if (!existingDoc) {
-          failPersist(`No existing document found for topic_id ${selectedTopicId}.`);
-          return;
-        }
-
-        console.log("[Persist] Existing document found:", existingDoc.id);
-        console.log("[Persist] Existing content length:", existingDoc.content_markdown?.length ?? 0);
-        console.log("[Persist] New content length:", content.length);
-
-        const updatedContent = `${existingDoc.content_markdown}\n\n---\n\n${content}`;
-        console.log("[Persist] Combined content length:", updatedContent.length);
-
-        const { error: updateError } = await supabase
-          .from("documents")
-          .update({ content_markdown: updatedContent })
-          .eq("id", existingDoc.id)
-          .eq("topic_id", selectedTopicId)
-          .select("id")
-          .single();
-
-        if (updateError) {
-          failPersist("Update document failed", updateError);
-          return;
-        }
-
-        console.log("[Persist] Document updated successfully. Inserting analytical_session...");
-
-        const { error: sessionError } = await supabase
-          .from("analytical_sessions")
-          .insert({
-            document_id: existingDoc.id,
-            source_issue: sourceText,
-            phases: {
-              a: { archive: archives.A, selected_items: selectedItems.A },
-              b: { archive: archives.B, selected_items: selectedItems.B },
-              c: { archive: archives.C, selected_items: selectedItems.C, custom_tags: customTags },
-            },
-          });
-
-        if (sessionError) {
-          failPersist("Insert session failed", sessionError);
-          return;
-        }
-
-        console.log("[Persist] APPEND MODE complete.");
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus("idle"), 3000);
-        return;
-      }
-
-      console.log("[Persist] NEW TOPIC MODE");
-      let topicId: string | null = selectedTopicId;
-
-      if (!topicId) {
-        const topicTitle = sourceText.trim().slice(0, 100) || "Untitled Topic";
-        console.log("[Persist] Inserting new topic...");
-        const { data: newTopic, error: topicError } = await supabase
-          .from("topics")
-          .insert({
-            title: topicTitle,
-            description: null,
-          })
-          .select()
-          .single();
-
-        if (topicError) {
-          failPersist("Insert topic failed", topicError);
-          return;
-        }
-
-        if (!newTopic) {
-          failPersist("No topic returned after insert.");
-          return;
-        }
-
-        console.log("[Persist] New topic created:", newTopic.id);
-        topicId = newTopic.id;
-        setTopics((prev) => [newTopic, ...prev]);
-      }
-
-      console.log("[Persist] Inserting new document with topic_id:", topicId);
-      const { data: document, error: docError } = await supabase
-        .from("documents")
-        .insert({
-          title: sourceText.slice(0, 50) || "Untitled Analysis",
-          content_markdown: content,
-          source_module: "analytical-pipeline",
-          topic_id: topicId,
-        })
-        .select()
-        .single();
-
-      if (docError) {
-        failPersist("Insert document failed", docError);
-        return;
-      }
-
-      if (!document) {
-        failPersist("No document returned after insert.");
-        return;
-      }
-
-      console.log("[Persist] New document created:", document.id);
-      console.log("[Persist] Inserting analytical_session...");
-
-      const { error: sessionError } = await supabase
-        .from("analytical_sessions")
-        .insert({
-          document_id: document.id,
-          source_issue: sourceText,
+      const response = await fetch("/api/analytical-pipeline/archive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content,
+          sourceText,
+          selectedTopicId,
           phases: {
             a: { archive: archives.A, selected_items: selectedItems.A },
             b: { archive: archives.B, selected_items: selectedItems.B },
             c: { archive: archives.C, selected_items: selectedItems.C, custom_tags: customTags },
           },
-        });
+        }),
+      });
 
-      if (sessionError) {
-        failPersist("Insert session failed", sessionError);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        failPersist(payload?.error ?? "Persist request failed.");
         return;
       }
 
-      console.log("[Persist] NEW TOPIC MODE complete.");
+      const payload = (await response.json()) as { topic?: Topic | null };
+      if (payload.topic) {
+        setTopics((prev) => [payload.topic as Topic, ...prev]);
+        setSelectedTopicId(payload.topic.id);
+      }
+
+      console.log("[Persist] archive write complete.");
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 3000);
     } catch (err) {

@@ -78,13 +78,17 @@ describe("POST /api/chat", () => {
 
     await expect(response.text()).resolves.toBe("制度降低交易成本");
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
     expect(mocks.openAIConstructor).toHaveBeenCalledWith({
       apiKey: "openrouter-key",
       baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Exocortex",
+      },
     });
     expect(mocks.chatCreate).toHaveBeenCalledWith({
-      model: "openai/gpt-4o-mini",
+      model: "qwen/qwen-2.5-72b-instruct",
       messages: [
         {
           role: "system",

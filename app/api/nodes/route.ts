@@ -27,6 +27,10 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
+function logServerError(context: string, error: unknown) {
+  console.error(`[Nodes API] ${context}:`, error);
+}
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
 
@@ -35,6 +39,10 @@ function getRequiredEnv(name: string): string {
   }
 
   return value;
+}
+
+function getRequiredSupabaseKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? getRequiredEnv("SUPABASE_KEY");
 }
 
 function isNodeData(row: RagChunkNodeRow): row is NodeData {
@@ -53,10 +61,10 @@ export async function GET() {
 
   try {
     supabaseUrl = getRequiredEnv("SUPABASE_URL");
-    supabaseKey = getRequiredEnv("SUPABASE_KEY");
+    supabaseKey = getRequiredSupabaseKey();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nodes gateway is not configured.";
-    return jsonError(message, 500);
+    logServerError("missing configuration", error);
+    return jsonError("Nodes gateway is not configured.", 500);
   }
 
   try {
@@ -67,7 +75,8 @@ export async function GET() {
       .order("chunk_index", { ascending: true });
 
     if (error) {
-      return jsonError(error.message, 502);
+      logServerError("Supabase query failed", error);
+      return jsonError("Nodes request failed.", 502);
     }
 
     const nodes = Array.isArray(data)
@@ -76,7 +85,7 @@ export async function GET() {
 
     return Response.json({ nodes } satisfies NodesResponseBody, { status: 200 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nodes request failed.";
-    return jsonError(message, 502);
+    logServerError("request failed", error);
+    return jsonError("Nodes request failed.", 502);
   }
 }
