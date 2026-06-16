@@ -56,6 +56,22 @@
     "topics": ["world", "geopolitics", "macro"]
   },
   {
+    "id": "federal-reserve-press",
+    "name": "Federal Reserve Press",
+    "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+    "modules": ["daily-briefing", "macro-intel"],
+    "regions": ["united-states", "global"],
+    "topics": ["monetary-policy", "capital-market", "macro"]
+  },
+  {
+    "id": "ecb-press",
+    "name": "European Central Bank Press",
+    "url": "https://www.ecb.europa.eu/rss/press.html",
+    "modules": ["daily-briefing", "macro-intel"],
+    "regions": ["europe", "global"],
+    "topics": ["monetary-policy", "capital-market", "macro"]
+  },
+  {
     "id": "scmp-economy",
     "name": "SCMP Economy",
     "url": "https://www.scmp.com/rss/91/feed",
@@ -123,6 +139,14 @@
     "id": "splash-247",
     "name": "Splash 247",
     "url": "https://splash247.com/feed/",
+    "modules": ["apac-supply-chain"],
+    "regions": ["global", "apac"],
+    "topics": ["shipping", "logistics", "supply-chain"]
+  },
+  {
+    "id": "marinelink",
+    "name": "MarineLink",
+    "url": "https://www.marinelink.com/news/rss",
     "modules": ["apac-supply-chain"],
     "regions": ["global", "apac"],
     "topics": ["shipping", "logistics", "supply-chain"]

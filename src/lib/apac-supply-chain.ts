@@ -62,6 +62,7 @@ export type SupplyIcon = "port" | "factory" | "zone" | "chain" | "market" | "tra
 export type SupplyVariant = "default" | "positive" | "warning" | "alert";
 
 export interface ApacSupplyItem {
+  articleId?: string;
   id: number;
   label: string;
   subtitle: string;
@@ -80,7 +81,11 @@ export interface ApacSupplyPayload {
   items: ApacSupplyItem[];
 }
 
-type Candidate = RawIntelligenceArticle;
+export interface ApacSourceArticle extends RawIntelligenceArticle {
+  articleId?: string;
+}
+
+type Candidate = ApacSourceArticle;
 
 const FALLBACK_ITEMS: ApacSupplyItem[] = [
   {
@@ -263,6 +268,7 @@ function toSupplyItem(candidate: Candidate, index: number): ApacSupplyItem {
   const variant = detectVariant(candidate);
 
   return {
+    articleId: candidate.articleId,
     id: index + 1,
     label: detectLabel(candidate),
     subtitle: `${candidate.source} · ${hostnameOf(candidate.url)}`,
@@ -275,15 +281,12 @@ function toSupplyItem(candidate: Candidate, index: number): ApacSupplyItem {
   };
 }
 
-export async function buildApacSupplyChainPayload(): Promise<ApacSupplyPayload> {
-  const feedResults = await fetchIntelligenceRssSources({
-    sources: APAC_SOURCES,
-    timeoutMs: FETCH_TIMEOUT_MS,
-    userAgent: "Mozilla/5.0 (compatible; KnowledgeGalaxySupplyChainCrawler/1.0)",
-    logWarning: (message, error) => console.warn(message, error),
-  });
-  const candidates = feedResults
-    .flatMap((result) => result.articles)
+export function buildApacSupplyChainPayloadFromArticles(input: {
+  articles: ApacSourceArticle[];
+  generatedAt: string;
+  sourceCount: number;
+}): ApacSupplyPayload {
+  const candidates = input.articles
     .map((candidate) => ({
       ...candidate,
       score: scoreCandidate(candidate),
@@ -305,9 +308,23 @@ export async function buildApacSupplyChainPayload(): Promise<ApacSupplyPayload> 
   }));
 
   return {
-    generatedAt: new Date().toISOString(),
-    sourceCount: APAC_SOURCES.length,
+    generatedAt: input.generatedAt,
+    sourceCount: input.sourceCount,
     candidatesCount: candidates.length,
     items,
   };
+}
+
+export async function buildApacSupplyChainPayload(): Promise<ApacSupplyPayload> {
+  const feedResults = await fetchIntelligenceRssSources({
+    sources: APAC_SOURCES,
+    timeoutMs: FETCH_TIMEOUT_MS,
+    userAgent: "Mozilla/5.0 (compatible; KnowledgeGalaxySupplyChainCrawler/1.0)",
+    logWarning: (message, error) => console.warn(message, error),
+  });
+  return buildApacSupplyChainPayloadFromArticles({
+    generatedAt: new Date().toISOString(),
+    sourceCount: APAC_SOURCES.length,
+    articles: feedResults.flatMap((result) => result.articles),
+  });
 }

@@ -14,6 +14,7 @@ export type MacroEventType =
   | "geopolitics";
 
 export interface MacroIntelItem {
+  articleId?: string;
   id: number;
   title: string;
   source: string;
@@ -33,6 +34,7 @@ export interface MacroIntelItem {
 
 export interface RawMacroArticle extends RawIntelligenceArticle {
   id: number;
+  articleId?: string;
   score: number;
 }
 
@@ -57,6 +59,10 @@ export interface MacroIntelPayload {
 interface BuildMacroPayloadOptions {
   now?: () => Date;
   fetchSources?: () => Promise<IntelligenceSourceFetchResult[]>;
+}
+
+export interface MacroSourceArticle extends RawIntelligenceArticle {
+  articleId?: string;
 }
 
 const FETCH_TIMEOUT_MS = 12_000;
@@ -130,12 +136,13 @@ function detectEventType(text: string): MacroEventType {
   return "policy";
 }
 
-function toMacroIntelItem(candidate: RawMacroArticle, index: number): MacroIntelItem {
+export function toMacroIntelItem(candidate: RawMacroArticle, index: number): MacroIntelItem {
   const text = `${candidate.title}. ${candidate.snippet}`;
   const eventType = detectEventType(text);
   const impactScore = Math.min(88, Math.max(55, candidate.score + 44));
 
   return {
+    articleId: candidate.articleId,
     id: index + 1,
     title: candidate.title,
     source: candidate.source,
@@ -175,10 +182,8 @@ async function fetchMacroSourceResults(
   });
 }
 
-async function getScoredCandidates(options: BuildMacroPayloadOptions = {}) {
-  const sourceResults = await fetchMacroSourceResults(options);
-  const candidates = sourceResults
-    .flatMap((result) => result.articles)
+export function scoreMacroArticles(articles: MacroSourceArticle[]): RawMacroArticle[] {
+  return articles
     .map((candidate) => ({
       ...candidate,
       score: scoreCandidate(candidate),
@@ -196,12 +201,53 @@ async function getScoredCandidates(options: BuildMacroPayloadOptions = {}) {
       id: index + 1,
       ...candidate,
     }));
+}
+
+async function getScoredCandidates(options: BuildMacroPayloadOptions = {}) {
+  const sourceResults = await fetchMacroSourceResults(options);
+  const candidates = scoreMacroArticles(sourceResults.flatMap((result) => result.articles));
 
   return {
     generatedAt: (options.now?.() ?? new Date()).toISOString(),
     sourceCount: MACRO_SOURCES.length,
     successfulSourceCount: sourceResults.filter((result) => result.articles.length > 0).length,
     candidates,
+  };
+}
+
+export function buildMacroRawArticlePayloadFromArticles(input: {
+  articles: MacroSourceArticle[];
+  generatedAt: string;
+  sourceCount: number;
+  successfulSourceCount: number;
+}): MacroRawArticlePayload {
+  const candidates = scoreMacroArticles(input.articles);
+
+  return {
+    generatedAt: input.generatedAt,
+    sourceCount: input.sourceCount,
+    successfulSourceCount: input.successfulSourceCount,
+    candidatesCount: candidates.length,
+    items: candidates,
+  };
+}
+
+export function buildMacroIntelPayloadFromArticles(input: {
+  articles: MacroSourceArticle[];
+  generatedAt: string;
+  sourceCount: number;
+  successfulSourceCount: number;
+}): MacroIntelPayload {
+  const candidates = scoreMacroArticles(input.articles);
+
+  return {
+    generatedAt: input.generatedAt,
+    sourceCount: input.sourceCount,
+    successfulSourceCount: input.successfulSourceCount,
+    candidatesCount: candidates.length,
+    llmEnabled: false,
+    llmProvider: null,
+    items: candidates.slice(0, MAX_ITEMS).map(toMacroIntelItem),
   };
 }
 
