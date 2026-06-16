@@ -672,11 +672,11 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
       try {
         const timestamp = Date.now();
         const [intelResponse, rawResponse] = await Promise.all([
-          fetch(`/data/macro-intel.json?t=${timestamp}`, {
+          fetch(`/api/macro-intel?t=${timestamp}`, {
             cache: "no-store",
             signal: requestController.signal,
           }),
-          fetch(`/data/macro-raw-articles.json?t=${timestamp}`, {
+          fetch(`/api/macro-raw-articles?t=${timestamp}`, {
             cache: "no-store",
             signal: requestController.signal,
           }),

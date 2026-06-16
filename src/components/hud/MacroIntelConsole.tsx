@@ -144,7 +144,7 @@ export function MacroIntelConsole({ isOpen, onClose }: MacroIntelConsoleProps) {
       setError(null);
 
       try {
-        const response = await fetch(`/data/macro-intel.json?t=${Date.now()}`, {
+        const response = await fetch(`/api/macro-intel?t=${Date.now()}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -258,7 +258,7 @@ export function MacroIntelConsole({ isOpen, onClose }: MacroIntelConsoleProps) {
                 <div className="flex flex-col items-start gap-2 font-mono text-xs text-white/55">
                   <span className="tracking-widest text-cyan-300/80">NO SIGNALS</span>
                   <span className="text-white/40">
-                    Run `npm run fetch:macro-intel` to generate the database.
+                    Macro intelligence API has not returned any signals yet.
                   </span>
                 </div>
               )}

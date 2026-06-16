@@ -53,7 +53,7 @@ describe("SaturnConsole", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/data/macro-raw-articles.json?t="),
+      expect.stringContaining("/api/macro-raw-articles?t="),
       expect.objectContaining({ cache: "no-store" })
     );
     expect(container.textContent).toContain("SATURN // RAW ARTICLE RADAR");

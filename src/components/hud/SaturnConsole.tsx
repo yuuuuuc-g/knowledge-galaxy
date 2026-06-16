@@ -79,7 +79,7 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
       setError(null);
 
       try {
-        const response = await fetch(`/data/macro-raw-articles.json?t=${Date.now()}`, {
+        const response = await fetch(`/api/macro-raw-articles?t=${Date.now()}`, {
           cache: "no-store",
         });
         if (!response.ok) {
@@ -194,7 +194,7 @@ export function SaturnConsole({ isOpen, onClose }: SaturnConsoleProps) {
                 <div className="flex flex-col items-start gap-2 font-mono text-xs text-white/55">
                   <span className="tracking-widest text-yellow-300/80">NO ARTICLES</span>
                   <span className="text-white/40">
-                    Run `npm run fetch:macro-intel` to generate the shared raw article feed.
+                    Macro raw article API has not returned any articles yet.
                   </span>
                 </div>
               )}

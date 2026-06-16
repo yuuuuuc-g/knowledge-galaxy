@@ -102,7 +102,7 @@ describe("SunConsole", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-09T03:04:05Z"));
     const fetchMock = vi.fn((url: string) => {
-      if (url.startsWith("/data/macro-intel.json")) {
+      if (url.startsWith("/api/macro-intel")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -133,7 +133,7 @@ describe("SunConsole", () => {
         });
       }
 
-      if (url.startsWith("/data/macro-raw-articles.json")) {
+      if (url.startsWith("/api/macro-raw-articles")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -193,7 +193,7 @@ describe("SunConsole", () => {
 
   it("loads clickable APAC supply-chain rows from the dynamic API", async () => {
     const fetchMock = vi.fn((url: string) => {
-      if (url.startsWith("/data/macro-intel.json")) {
+      if (url.startsWith("/api/macro-intel")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -206,7 +206,7 @@ describe("SunConsole", () => {
         });
       }
 
-      if (url.startsWith("/data/macro-raw-articles.json")) {
+      if (url.startsWith("/api/macro-raw-articles")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -244,7 +244,7 @@ describe("SunConsole", () => {
         });
       }
 
-      if (url.startsWith("/data/macro-raw-articles.json")) {
+      if (url.startsWith("/api/macro-raw-articles")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -300,7 +300,7 @@ describe("SunConsole", () => {
 
   it("loads structured macro intelligence into the intelligence board", async () => {
     const fetchMock = vi.fn((url: string) => {
-      if (url.startsWith("/data/macro-intel.json")) {
+      if (url.startsWith("/api/macro-intel")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -399,7 +399,7 @@ describe("SunConsole", () => {
   it("refreshes APAC supply-chain data every hour while the console is open", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn((url: string) => {
-      if (url.startsWith("/data/macro-intel.json")) {
+      if (url.startsWith("/api/macro-intel")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -412,7 +412,7 @@ describe("SunConsole", () => {
         });
       }
 
-      if (url.startsWith("/data/macro-raw-articles.json")) {
+      if (url.startsWith("/api/macro-raw-articles")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({

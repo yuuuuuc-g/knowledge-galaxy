@@ -81,6 +81,8 @@ data/
 rag-pipeline/*.epub
 rag-pipeline/*.epub/
 supabase/.temp/
+public/data/macro-intel.json
+public/data/macro-raw-articles.json
 
 # ─────────────────────────────────────────────
 # 12. Local Agent/Scratch State
