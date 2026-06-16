@@ -1,5 +1,7 @@
 -- Intelligence pipeline: shared source ingestion plus module-specific derived outputs.
 
+create extension if not exists pgcrypto;
+
 create table if not exists intelligence_sources (
   id text primary key,
   name text not null,
@@ -13,7 +15,7 @@ create table if not exists intelligence_sources (
 );
 
 create table if not exists source_articles (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   source_id text references intelligence_sources(id) on delete set null,
   source_name text not null,
   title text not null,
@@ -26,7 +28,7 @@ create table if not exists source_articles (
 );
 
 create table if not exists ingestion_jobs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_type text not null,
   status text not null check (status in ('running', 'completed', 'failed')),
   started_at timestamp with time zone default now() not null,
@@ -47,7 +49,7 @@ create table if not exists module_scan_state (
 );
 
 create table if not exists macro_intel_items (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   article_id uuid references source_articles(id) on delete cascade,
   title text not null,
   source text not null,
@@ -67,7 +69,7 @@ create table if not exists macro_intel_items (
 );
 
 create table if not exists apac_supply_chain_signals (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   article_id uuid references source_articles(id) on delete cascade,
   label text not null,
   subtitle text not null,

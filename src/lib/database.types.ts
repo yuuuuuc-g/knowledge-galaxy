@@ -49,6 +49,56 @@ export type Database = {
           },
         ]
       }
+      apac_supply_chain_signals: {
+        Row: {
+          article_id: string | null
+          generated_at: string
+          icon: string
+          id: string
+          label: string
+          metric_label: string
+          published_at: string | null
+          subtitle: string
+          url: string
+          value: string
+          variant: string | null
+        }
+        Insert: {
+          article_id?: string | null
+          generated_at?: string
+          icon: string
+          id?: string
+          label: string
+          metric_label: string
+          published_at?: string | null
+          subtitle: string
+          url: string
+          value: string
+          variant?: string | null
+        }
+        Update: {
+          article_id?: string | null
+          generated_at?: string
+          icon?: string
+          id?: string
+          label?: string
+          metric_label?: string
+          published_at?: string | null
+          subtitle?: string
+          url?: string
+          value?: string
+          variant?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apac_supply_chain_signals_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "source_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_briefings: {
         Row: {
           ai_summary: string
@@ -116,6 +166,173 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ingestion_jobs: {
+        Row: {
+          error: string | null
+          fetched_count: number
+          finished_at: string | null
+          id: string
+          inserted_count: number
+          job_type: string
+          metadata: Json
+          source_count: number
+          started_at: string
+          status: string
+        }
+        Insert: {
+          error?: string | null
+          fetched_count?: number
+          finished_at?: string | null
+          id?: string
+          inserted_count?: number
+          job_type: string
+          metadata?: Json
+          source_count?: number
+          started_at?: string
+          status: string
+        }
+        Update: {
+          error?: string | null
+          fetched_count?: number
+          finished_at?: string | null
+          id?: string
+          inserted_count?: number
+          job_type?: string
+          metadata?: Json
+          source_count?: number
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      intelligence_sources: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          modules: string[]
+          name: string
+          regions: string[]
+          topics: string[]
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id: string
+          modules?: string[]
+          name: string
+          regions?: string[]
+          topics?: string[]
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          modules?: string[]
+          name?: string
+          regions?: string[]
+          topics?: string[]
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      macro_intel_items: {
+        Row: {
+          affected_regions: string[]
+          affected_sectors: string[]
+          article_id: string | null
+          capital_impact: string
+          confidence: number
+          core_logic: string
+          event_type: string
+          evidence: string[]
+          generated_at: string
+          id: string
+          impact_score: number
+          policy_intent: string
+          published_at: string | null
+          source: string
+          time_horizon: string
+          title: string
+          url: string
+        }
+        Insert: {
+          affected_regions?: string[]
+          affected_sectors?: string[]
+          article_id?: string | null
+          capital_impact: string
+          confidence: number
+          core_logic: string
+          event_type: string
+          evidence?: string[]
+          generated_at?: string
+          id?: string
+          impact_score: number
+          policy_intent: string
+          published_at?: string | null
+          source: string
+          time_horizon: string
+          title: string
+          url: string
+        }
+        Update: {
+          affected_regions?: string[]
+          affected_sectors?: string[]
+          article_id?: string | null
+          capital_impact?: string
+          confidence?: number
+          core_logic?: string
+          event_type?: string
+          evidence?: string[]
+          generated_at?: string
+          id?: string
+          impact_score?: number
+          policy_intent?: string
+          published_at?: string | null
+          source?: string
+          time_horizon?: string
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "macro_intel_items_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "source_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_scan_state: {
+        Row: {
+          last_scanned_article_at: string | null
+          last_success_at: string | null
+          metadata: Json
+          module_id: string
+          updated_at: string
+        }
+        Insert: {
+          last_scanned_article_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json
+          module_id: string
+          updated_at?: string
+        }
+        Update: {
+          last_scanned_article_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json
+          module_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       rag_books: {
         Row: {
@@ -190,6 +407,53 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "rag_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_articles: {
+        Row: {
+          content_hash: string | null
+          fetched_at: string
+          id: string
+          published_at: string | null
+          raw_payload: Json
+          snippet: string
+          source_id: string | null
+          source_name: string
+          title: string
+          url: string
+        }
+        Insert: {
+          content_hash?: string | null
+          fetched_at?: string
+          id?: string
+          published_at?: string | null
+          raw_payload?: Json
+          snippet?: string
+          source_id?: string | null
+          source_name: string
+          title: string
+          url: string
+        }
+        Update: {
+          content_hash?: string | null
+          fetched_at?: string
+          id?: string
+          published_at?: string | null
+          raw_payload?: Json
+          snippet?: string
+          source_id?: string | null
+          source_name?: string
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_articles_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "intelligence_sources"
             referencedColumns: ["id"]
           },
         ]
