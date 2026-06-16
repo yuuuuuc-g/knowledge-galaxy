@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { config as loadEnv } from "dotenv";
@@ -15,14 +16,9 @@ const FETCH_TIMEOUT_MS = 12_000;
 const MAX_CANDIDATES = 12;
 const MAX_ITEMS = 4;
 const MIN_SUMMARY_LENGTH = 200;
+const SOURCE_REGISTRY_PATH = new URL("../config/intelligence-sources.json", import.meta.url);
 
-const DEFAULT_SOURCES = [
-  { name: "SCMP Economy", url: "https://www.scmp.com/rss/91/feed" },
-  { name: "Nikkei Asia", url: "https://asia.nikkei.com/rss/feed/nar" },
-  { name: "NYT Business", url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml" },
-  { name: "The Guardian Business", url: "https://www.theguardian.com/business/rss" },
-  { name: "Al Jazeera Economy", url: "https://www.aljazeera.com/xml/rss/all.xml" },
-];
+const DEFAULT_SOURCES = loadSourcesFromRegistry("macro-intel");
 
 const MACRO_KEYWORDS = [
   "policy",
@@ -96,6 +92,32 @@ Environment:
 The script writes the Intelligence Board payload:
   { generatedAt, sourceCount, candidatesCount, llmEnabled, items: [...] }
 `);
+}
+
+function isRegistrySource(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    typeof value.name === "string" &&
+    typeof value.url === "string" &&
+    Array.isArray(value.modules)
+  );
+}
+
+function loadSourcesFromRegistry(moduleId) {
+  const raw = readFileSync(SOURCE_REGISTRY_PATH, "utf8");
+  const parsed = JSON.parse(raw);
+
+  if (!Array.isArray(parsed) || !parsed.every(isRegistrySource)) {
+    throw new Error("Invalid intelligence source registry.");
+  }
+
+  return parsed
+    .filter((source) => source.modules.includes(moduleId))
+    .map((source) => ({
+      name: source.name,
+      url: source.url,
+    }));
 }
 
 function readProxyEnv(name) {

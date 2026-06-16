@@ -34,6 +34,12 @@ The highest-ranked Search Result for a Retrieval.
 **Generation**:
 An answer synthesis step that uses the user's question and Search Results to produce a grounded natural-language response.
 
+**Intelligence Source**:
+An external RSS/news feed registered once and shared by intelligence Modules.
+
+**Source Strategy**:
+A Module-specific filtering, scoring, selection, or extraction rule applied to shared Intelligence Sources.
+
 ## Relationships
 
 - A **Planet** provides access to exactly one **Module**
@@ -43,6 +49,8 @@ An answer synthesis step that uses the user's question and Search Results to pro
 - A **Retrieval** can return multiple **Search Results**
 - A **Hit@1** belongs to exactly one **Retrieval**
 - A **Generation** is grounded in one **Retrieval**
+- Multiple **Modules** can share the same **Intelligence Source**
+- A **Source Strategy** belongs to exactly one **Module**
 
 ## Example dialogue
 

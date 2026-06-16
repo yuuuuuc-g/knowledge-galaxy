@@ -2,19 +2,17 @@ import { setDefaultResultOrder } from "node:dns";
 import { Agent } from "undici";
 import { generateText, type LanguageModel } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import Parser from "rss-parser";
 import { z } from "zod";
 import type { Database } from "@/src/lib/database.types";
+import {
+  fetchIntelligenceRssSources,
+  type RawIntelligenceArticle,
+} from "@/src/modules/intelligence/rss-fetcher";
+import { getIntelligenceSourcesForModule } from "@/src/modules/intelligence/source-registry";
 
 setDefaultResultOrder("ipv4first");
 
-export interface RawHeadline {
-  source: string;
-  title: string;
-  url: string;
-  snippet: string;
-  publishedAt: string | null;
-}
+export type RawHeadline = RawIntelligenceArticle;
 
 export interface BriefingItem {
   title: string;
@@ -48,19 +46,7 @@ export type DailyBriefingJobResult =
       error: string;
     };
 
-export const RSS_SOURCES: { name: string; url: string }[] = [
-  { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
-  { name: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
-  { name: "The Guardian World", url: "https://www.theguardian.com/world/rss" },
-  { name: "NYT World", url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml" },
-  { name: "NYT Business", url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml" },
-  { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
-  { name: "SCMP", url: "https://www.scmp.com/rss/91/feed" },
-  { name: "Nikkei Asia", url: "https://asia.nikkei.com/rss/feed/nar" },
-  { name: "36Kr", url: "https://36kr.com/feed" },
-  { name: "The Paper World", url: "https://www.thepaper.cn/rss_newslist.jsp?nodeid=25949" },
-  { name: "Tencent News", url: "https://news.qq.com/newsgn/rss_newsgn.xml" },
-];
+export const RSS_SOURCES = getIntelligenceSourcesForModule("daily-briefing");
 
 const MAX_TOTAL_HEADLINES = 50;
 const PER_SOURCE_CAP = 8;
@@ -71,6 +57,8 @@ const ipv4OnlyAgent = new Agent({
   bodyTimeout: 12_000,
   headersTimeout: 8_000,
 });
+
+type NodeFetchRequestInit = RequestInit & { dispatcher: Agent };
 
 const briefingItemSchema = z.object({
   title: z.string().min(1),
@@ -109,62 +97,26 @@ export function buildEditorialPrompt(headlines: RawHeadline[]): string {
   return `今日候选新闻列表（共 ${headlines.length} 条）：\n\n${lines.join("\n\n")}\n\n请挑选 5-10 条结构性影响最大的新闻。url 与 source 字段必须严格使用上面列表里出现过的原值。`;
 }
 
-export async function fetchOneFeed(
-  parser: Parser,
-  source: { name: string; url: string }
-): Promise<RawHeadline[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), RSS_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(source.url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; ExocortexSaturnRadar/1.0; +https://exocortex.local)",
-      },
-      cache: "no-store",
-      // @ts-expect-error - undici dispatcher is supported by Node fetch but not in lib.dom types.
-      dispatcher: ipv4OnlyAgent,
-    });
-
-    if (!response.ok) {
-      console.warn(`[Saturn] feed ${source.name} returned ${response.status}`);
-      return [];
-    }
-
-    const xml = await response.text();
-    const feed = await parser.parseString(xml);
-
-    return (feed.items ?? [])
-      .slice(0, PER_SOURCE_CAP)
-      .map<RawHeadline | null>((item) => {
-        const title = (item.title ?? "").trim();
-        const url = (item.link ?? "").trim();
-        if (!title || !url) return null;
-        const snippet = (item.contentSnippet ?? item.content ?? "").trim().slice(0, 280);
-        return {
-          source: source.name,
-          title,
-          url,
-          snippet,
-          publishedAt: item.isoDate ?? item.pubDate ?? null,
-        };
-      })
-      .filter((item): item is RawHeadline => item !== null);
-  } catch (error) {
-    console.warn(`[Saturn] feed ${source.name} failed`, error);
-    return [];
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export function createRssHeadlineFetcher(): () => Promise<RawHeadline[]> {
   return async () => {
-    const parser = new Parser({ timeout: RSS_TIMEOUT_MS });
-    const feedResults = await Promise.all(RSS_SOURCES.map((source) => fetchOneFeed(parser, source)));
-    return feedResults.flat().slice(0, MAX_TOTAL_HEADLINES);
+    const feedResults = await fetchIntelligenceRssSources({
+      sources: RSS_SOURCES,
+      timeoutMs: RSS_TIMEOUT_MS,
+      perSourceCap: PER_SOURCE_CAP,
+      userAgent: "Mozilla/5.0 (compatible; ExocortexSaturnRadar/1.0; +https://exocortex.local)",
+      logWarning: (message, error) => console.warn(message, error),
+      buildRequestInit: ({ signal, userAgent }) =>
+        ({
+          signal,
+          headers: {
+            "User-Agent": userAgent,
+          },
+          cache: "no-store",
+          dispatcher: ipv4OnlyAgent,
+        }) as NodeFetchRequestInit,
+    });
+
+    return feedResults.flatMap((result) => result.articles).slice(0, MAX_TOTAL_HEADLINES);
   };
 }
 

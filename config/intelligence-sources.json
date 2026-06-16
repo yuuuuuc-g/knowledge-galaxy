@@ -1,0 +1,130 @@
+[
+  {
+    "id": "bbc-world",
+    "name": "BBC World",
+    "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "modules": ["daily-briefing"],
+    "regions": ["global"],
+    "topics": ["world", "geopolitics"]
+  },
+  {
+    "id": "bbc-business",
+    "name": "BBC Business",
+    "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+    "modules": ["daily-briefing"],
+    "regions": ["global"],
+    "topics": ["business", "macro"]
+  },
+  {
+    "id": "guardian-world",
+    "name": "The Guardian World",
+    "url": "https://www.theguardian.com/world/rss",
+    "modules": ["daily-briefing"],
+    "regions": ["global"],
+    "topics": ["world", "geopolitics"]
+  },
+  {
+    "id": "guardian-business",
+    "name": "The Guardian Business",
+    "url": "https://www.theguardian.com/business/rss",
+    "modules": ["macro-intel"],
+    "regions": ["global"],
+    "topics": ["business", "macro"]
+  },
+  {
+    "id": "nyt-world",
+    "name": "NYT World",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "modules": ["daily-briefing"],
+    "regions": ["global"],
+    "topics": ["world", "geopolitics"]
+  },
+  {
+    "id": "nyt-business",
+    "name": "NYT Business",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+    "modules": ["daily-briefing", "macro-intel"],
+    "regions": ["global"],
+    "topics": ["business", "macro", "capital-market"]
+  },
+  {
+    "id": "al-jazeera",
+    "name": "Al Jazeera",
+    "url": "https://www.aljazeera.com/xml/rss/all.xml",
+    "modules": ["daily-briefing", "macro-intel"],
+    "regions": ["global"],
+    "topics": ["world", "geopolitics", "macro"]
+  },
+  {
+    "id": "scmp-economy",
+    "name": "SCMP Economy",
+    "url": "https://www.scmp.com/rss/91/feed",
+    "modules": ["daily-briefing", "macro-intel", "apac-supply-chain"],
+    "regions": ["china", "apac"],
+    "topics": ["economy", "macro", "trade", "supply-chain"]
+  },
+  {
+    "id": "nikkei-asia",
+    "name": "Nikkei Asia",
+    "url": "https://asia.nikkei.com/rss/feed/nar",
+    "modules": ["daily-briefing", "macro-intel", "apac-supply-chain"],
+    "regions": ["apac"],
+    "topics": ["business", "macro", "trade", "supply-chain"]
+  },
+  {
+    "id": "36kr",
+    "name": "36Kr",
+    "url": "https://36kr.com/feed",
+    "modules": ["daily-briefing"],
+    "regions": ["china"],
+    "topics": ["business", "technology"]
+  },
+  {
+    "id": "the-paper-world",
+    "name": "The Paper World",
+    "url": "https://www.thepaper.cn/rss_newslist.jsp?nodeid=25949",
+    "modules": ["daily-briefing"],
+    "regions": ["china", "global"],
+    "topics": ["world", "geopolitics"]
+  },
+  {
+    "id": "tencent-news",
+    "name": "Tencent News",
+    "url": "https://news.qq.com/newsgn/rss_newsgn.xml",
+    "modules": ["daily-briefing"],
+    "regions": ["china"],
+    "topics": ["world", "macro"]
+  },
+  {
+    "id": "cnbc-asia",
+    "name": "CNBC Asia",
+    "url": "https://www.cnbc.com/id/19832390/device/rss/rss.html",
+    "modules": ["apac-supply-chain"],
+    "regions": ["apac"],
+    "topics": ["business", "trade", "supply-chain"]
+  },
+  {
+    "id": "the-loadstar",
+    "name": "The Loadstar",
+    "url": "https://theloadstar.com/feed/",
+    "modules": ["apac-supply-chain"],
+    "regions": ["global", "apac"],
+    "topics": ["shipping", "logistics", "supply-chain"]
+  },
+  {
+    "id": "hellenic-shipping-news",
+    "name": "Hellenic Shipping News",
+    "url": "https://www.hellenicshippingnews.com/feed/",
+    "modules": ["apac-supply-chain"],
+    "regions": ["global", "apac"],
+    "topics": ["shipping", "logistics", "supply-chain"]
+  },
+  {
+    "id": "splash-247",
+    "name": "Splash 247",
+    "url": "https://splash247.com/feed/",
+    "modules": ["apac-supply-chain"],
+    "regions": ["global", "apac"],
+    "topics": ["shipping", "logistics", "supply-chain"]
+  }
+]

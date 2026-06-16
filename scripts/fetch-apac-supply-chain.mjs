@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import Parser from "rss-parser";
@@ -7,15 +8,9 @@ import Parser from "rss-parser";
 const DEFAULT_OUTPUT = "public/data/apac-supply-chain.json";
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_ITEMS = 6;
+const SOURCE_REGISTRY_PATH = new URL("../config/intelligence-sources.json", import.meta.url);
 
-const RSS_SOURCES = [
-  { name: "Nikkei Asia", url: "https://asia.nikkei.com/rss/feed/nar" },
-  { name: "SCMP Economy", url: "https://www.scmp.com/rss/91/feed" },
-  { name: "CNBC Asia", url: "https://www.cnbc.com/id/19832390/device/rss/rss.html" },
-  { name: "The Loadstar", url: "https://theloadstar.com/feed/" },
-  { name: "Hellenic Shipping News", url: "https://www.hellenicshippingnews.com/feed/" },
-  { name: "Splash 247", url: "https://splash247.com/feed/" },
-];
+const RSS_SOURCES = loadSourcesFromRegistry("apac-supply-chain");
 
 const SUPPLY_KEYWORD_WEIGHTS = [
   ["supply chain", 8],
@@ -149,6 +144,32 @@ Fetches APAC supply-chain signals from public RSS/news feeds and writes the
 SunConsole-compatible JSON payload:
   { generatedAt, sourceCount, candidatesCount, items: [...] }
 `);
+}
+
+function isRegistrySource(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    typeof value.name === "string" &&
+    typeof value.url === "string" &&
+    Array.isArray(value.modules)
+  );
+}
+
+function loadSourcesFromRegistry(moduleId) {
+  const raw = readFileSync(SOURCE_REGISTRY_PATH, "utf8");
+  const parsed = JSON.parse(raw);
+
+  if (!Array.isArray(parsed) || !parsed.every(isRegistrySource)) {
+    throw new Error("Invalid intelligence source registry.");
+  }
+
+  return parsed
+    .filter((source) => source.modules.includes(moduleId))
+    .map((source) => ({
+      name: source.name,
+      url: source.url,
+    }));
 }
 
 function stripHtml(value) {

@@ -1,16 +1,13 @@
-import Parser from "rss-parser";
+import {
+  fetchIntelligenceRssSources,
+  type RawIntelligenceArticle,
+} from "@/src/modules/intelligence/rss-fetcher";
+import { getIntelligenceSourcesForModule } from "@/src/modules/intelligence/source-registry";
 
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_ITEMS = 6;
 
-const RSS_SOURCES = [
-  { name: "Nikkei Asia", url: "https://asia.nikkei.com/rss/feed/nar" },
-  { name: "SCMP Economy", url: "https://www.scmp.com/rss/91/feed" },
-  { name: "CNBC Asia", url: "https://www.cnbc.com/id/19832390/device/rss/rss.html" },
-  { name: "The Loadstar", url: "https://theloadstar.com/feed/" },
-  { name: "Hellenic Shipping News", url: "https://www.hellenicshippingnews.com/feed/" },
-  { name: "Splash 247", url: "https://splash247.com/feed/" },
-] satisfies { name: string; url: string }[];
+const APAC_SOURCES = getIntelligenceSourcesForModule("apac-supply-chain");
 
 const SUPPLY_KEYWORD_WEIGHTS = [
   ["supply chain", 8],
@@ -83,13 +80,7 @@ export interface ApacSupplyPayload {
   items: ApacSupplyItem[];
 }
 
-interface Candidate {
-  source: string;
-  title: string;
-  url: string;
-  snippet: string;
-  publishedAt: string | null;
-}
+type Candidate = RawIntelligenceArticle;
 
 const FALLBACK_ITEMS: ApacSupplyItem[] = [
   {
@@ -142,13 +133,6 @@ const FALLBACK_ITEMS: ApacSupplyItem[] = [
     icon: "trade",
   },
 ];
-
-function stripHtml(value: string) {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function truncate(value: string, maxLength: number) {
   if (value.length <= maxLength) {
@@ -291,60 +275,15 @@ function toSupplyItem(candidate: Candidate, index: number): ApacSupplyItem {
   };
 }
 
-async function fetchFeed(parser: Parser, source: { name: string; url: string }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(source.url, {
-      cache: "no-store",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; KnowledgeGalaxySupplyChainCrawler/1.0)",
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      console.warn(`[APAC crawler] ${source.name} returned ${response.status}`);
-      return [];
-    }
-
-    const xml = await response.text();
-    const feed = await parser.parseString(xml);
-
-    return (feed.items ?? [])
-      .map((item) => {
-        const title = stripHtml(item.title ?? "");
-        const url = item.link ?? "";
-        if (!title || !url) {
-          return null;
-        }
-
-        return {
-          source: source.name,
-          title,
-          url,
-          snippet: truncate(stripHtml(item.contentSnippet ?? item.content ?? ""), 260),
-          publishedAt: item.isoDate ?? item.pubDate ?? null,
-        };
-      })
-      .filter((item): item is Candidate => item !== null);
-  } catch (error) {
-    console.warn(`[APAC crawler] ${source.name} failed: ${String(error)}`);
-    return [];
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export async function buildApacSupplyChainPayload(): Promise<ApacSupplyPayload> {
-  const parser = new Parser({ timeout: FETCH_TIMEOUT_MS });
-  const feedResults = await Promise.all(
-    RSS_SOURCES.map((source) => fetchFeed(parser, source))
-  );
+  const feedResults = await fetchIntelligenceRssSources({
+    sources: APAC_SOURCES,
+    timeoutMs: FETCH_TIMEOUT_MS,
+    userAgent: "Mozilla/5.0 (compatible; KnowledgeGalaxySupplyChainCrawler/1.0)",
+    logWarning: (message, error) => console.warn(message, error),
+  });
   const candidates = feedResults
-    .flat()
+    .flatMap((result) => result.articles)
     .map((candidate) => ({
       ...candidate,
       score: scoreCandidate(candidate),
@@ -367,7 +306,7 @@ export async function buildApacSupplyChainPayload(): Promise<ApacSupplyPayload> 
 
   return {
     generatedAt: new Date().toISOString(),
-    sourceCount: RSS_SOURCES.length,
+    sourceCount: APAC_SOURCES.length,
     candidatesCount: candidates.length,
     items,
   };
