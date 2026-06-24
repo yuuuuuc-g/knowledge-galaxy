@@ -164,6 +164,7 @@ describe("SunConsole", () => {
     const ringChart = container.querySelector('[data-testid="micro-chart-ring"]');
     const lineChart = container.querySelector('[data-testid="micro-chart-line"]');
     const barCharts = container.querySelectorAll('[data-testid="micro-chart-bar"]');
+    const rawVolumeLinePoints = lineChart?.querySelector("polyline")?.getAttribute("points");
     const initialBars = barCharts[0]?.querySelectorAll("rect");
     const initialBarHeights = Array.from(initialBars ?? []).map((bar) =>
       bar.getAttribute("height")
@@ -188,6 +189,9 @@ describe("SunConsole", () => {
     const updatedBarHeights = Array.from(updatedBars ?? []).map((bar) =>
       bar.getAttribute("height")
     );
+    const updatedRawVolumeLinePoints = lineChart?.querySelector("polyline")?.getAttribute("points");
+
+    expect(updatedRawVolumeLinePoints).toBe(rawVolumeLinePoints);
     expect(updatedBarHeights).not.toEqual(initialBarHeights);
   });
 
@@ -298,6 +302,67 @@ describe("SunConsole", () => {
     expect(articleLink?.getAttribute("rel")).toBe("noreferrer");
   });
 
+  it("keeps long APAC article feeds vertically scrollable", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/macro-intel")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      if (url.startsWith("/api/macro-raw-articles")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 5,
+            successfulSourceCount: 4,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: "2026-06-09T03:04:05.000Z",
+          items: Array.from({ length: 8 }, (_, index) => ({
+            id: index + 1,
+            label: `APAC lane ${index + 1}`,
+            subtitle: "Live Feed · example.test",
+            value: `Supply-chain article ${index + 1}`,
+            metricLabel: "Maritime Signal",
+            icon: "port",
+            variant: "default",
+            url: `https://example.test/apac-cargo-${index + 1}`,
+          })),
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const feed = container.querySelector('[data-testid="apac-supply-chain-feed"]');
+
+    expect(feed).not.toBeNull();
+    expect(feed?.className).toContain("overflow-y-auto");
+    expect(feed?.className).not.toContain("overflow-hidden");
+    expect(container.querySelectorAll('a[aria-label^="Read APAC supply-chain article"]')).toHaveLength(8);
+  });
+
   it("shows the latest daily article update count from the ingest status API", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.startsWith("/api/intelligence-ingest-status")) {
@@ -362,6 +427,11 @@ describe("SunConsole", () => {
     expect(container.textContent).toContain("Last ingest 17/06, 15:01 BJT");
     expect(container.textContent).toContain("19 sources");
     expect(container.textContent).not.toContain("供应链健康度 / Supply Chain Health");
+
+    const dailyArticleChart = container.querySelector('[data-testid="daily-article-line-chart"]');
+
+    expect(dailyArticleChart?.querySelector("polyline")).not.toBeNull();
+    expect(dailyArticleChart?.querySelectorAll("circle")).toHaveLength(10);
   });
 
   it("loads structured macro intelligence into the intelligence board", async () => {

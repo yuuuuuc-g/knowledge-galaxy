@@ -347,14 +347,6 @@ function nextSeries(values: number[], min: number, max: number) {
   return [...values.slice(1), Number(next.toFixed(1))];
 }
 
-function nextIntegerSeries(values: number[], min: number, max: number) {
-  const last = values[values.length - 1] ?? min;
-  const delta = ((last * 11 + values.length * 5) % 5) - 2;
-  const next = Math.min(max, Math.max(min, last + delta));
-
-  return [...values.slice(1), next];
-}
-
 function average(values: number[]) {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
@@ -414,15 +406,26 @@ function buildRawVolumeSeries(candidatesCount: number) {
   });
 }
 
-function buildLinePath(values: number[], min: number, max: number) {
-  return values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * 100;
-      const y = 30 - normalize(value, min, max) * 22;
+interface ChartPoint {
+  x: number;
+  y: number;
+}
 
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
+function buildLinePoints(values: number[], min: number, max: number): ChartPoint[] {
+  return values.map((value, index) => ({
+    x: (index / Math.max(values.length - 1, 1)) * 100,
+    y: 30 - normalize(value, min, max) * 22,
+  }));
+}
+
+function formatLinePoints(points: ChartPoint[]) {
+  return points
+    .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
     .join(" ");
+}
+
+function buildLinePath(values: number[], min: number, max: number) {
+  return formatLinePoints(buildLinePoints(values, min, max));
 }
 
 function formatApacUpdatedAt(value: string | null) {
@@ -566,7 +569,7 @@ function LineMicroChart({ values, min, max }: LineMicroChartProps) {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeWidth="0.4"
       />
       <polyline
         className={SVG_GLOW_CLASS}
@@ -575,7 +578,7 @@ function LineMicroChart({ values, min, max }: LineMicroChartProps) {
         points={points}
         stroke="currentColor"
         strokeLinejoin="round"
-        strokeWidth="6"
+        strokeWidth="1.2"
       />
     </svg>
   );
@@ -626,6 +629,55 @@ function BarMicroChart({ values, min, max }: BarMicroChartProps) {
           />
         );
       })}
+    </svg>
+  );
+}
+
+interface DailyArticleLineChartProps {
+  values: number[];
+}
+
+function DailyArticleLineChart({ values }: DailyArticleLineChartProps) {
+  const points = buildLinePoints(values, 0, 100);
+  const linePoints = formatLinePoints(points);
+
+  return (
+    <svg
+      aria-label="Daily article update line chart"
+      className={`mt-3 h-16 w-full border-b border-l border-cyan-900/60 px-2 text-cyan-300 ${SVG_GLOW_CLASS}`}
+      data-testid="daily-article-line-chart"
+      preserveAspectRatio="none"
+      viewBox="0 0 100 34"
+    >
+      <polyline
+        className={SVG_GLOW_CLASS}
+        fill="none"
+        opacity="0.24"
+        points={linePoints}
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1"
+      />
+      <polyline
+        className={SVG_GLOW_CLASS}
+        fill="none"
+        points={linePoints}
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="0.32"
+      />
+      {points.map((point, index) => (
+        <circle
+          key={`${point.x}-${point.y}-${index}`}
+          className={SVG_GLOW_CLASS}
+          cx={point.x}
+          cy={point.y}
+          fill="currentColor"
+          r="1.4"
+        />
+      ))}
     </svg>
   );
 }
@@ -871,11 +923,7 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
     const timerId = window.setInterval(() => {
       setMicroCharts((current) => ({
         sourceCoverage: current.sourceCoverage,
-        rawVolume: nextIntegerSeries(
-          current.rawVolume,
-          0,
-          Math.max(12, Math.max(...current.rawVolume) + 2)
-        ),
+        rawVolume: current.rawVolume,
         impactDensity: current.impactDensity.map((value, index) => {
           const direction = ((current.rawVolume.at(-1) ?? 0) + index) % 2 === 0 ? 1 : -1;
           return clamp(value + direction, 0, Math.max(4, ...current.impactDensity));
@@ -1177,7 +1225,11 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                       <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-200 shadow-[0_0_28px_10px_rgba(34,211,238,0.42)]" />
                     </div>
 
-                    <ul className="min-h-0 space-y-1 overflow-hidden">
+                    <ul
+                      aria-label="APAC supply-chain articles"
+                      className="min-h-0 space-y-1 overflow-x-hidden overflow-y-auto pr-1"
+                      data-testid="apac-supply-chain-feed"
+                    >
                       {supplyItems.map((item) => {
                         const rowContent = (
                           <>
@@ -1252,16 +1304,7 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                           ? ` · ${dailyArticleStats.sourceCount} sources`
                           : ""}
                       </div>
-                      <div className="mt-3 flex h-16 items-end gap-2 border-b border-l border-cyan-900/60 px-2">
-                        {dailyArticlePulse.map((height, index) => (
-                          <span key={index} className="relative h-full flex-1">
-                            <span
-                              className="absolute bottom-0 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.75)]"
-                              style={{ bottom: `${height}%` }}
-                            />
-                          </span>
-                        ))}
-                      </div>
+                      <DailyArticleLineChart values={dailyArticlePulse} />
                     </div>
                   </div>
                 </section>
