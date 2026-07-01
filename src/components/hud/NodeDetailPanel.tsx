@@ -11,6 +11,7 @@ interface NodeDetailPanelProps {
   onEnterKnowledgeGraph: () => void;
   onEnterExocortex: () => void;
   onEnterMacroIntel: () => void;
+  onEnterSocialSignals: () => void;
   onOpenSaturnRadar: () => void;
   isRAGOpen: boolean;
 }
@@ -21,6 +22,7 @@ export function NodeDetailPanel({
   onEnterKnowledgeGraph,
   onEnterExocortex,
   onEnterMacroIntel,
+  onEnterSocialSignals,
   onOpenSaturnRadar,
   isRAGOpen,
 }: NodeDetailPanelProps) {
@@ -46,6 +48,9 @@ export function NodeDetailPanel({
       case "macro-intel":
         onEnterMacroIntel();
         break;
+      case "social-signals":
+        onEnterSocialSignals();
+        break;
       default:
         alert(`Entering ${focusedPlanet.label ?? focusedPlanet.name}...`);
     }
@@ -54,6 +59,7 @@ export function NodeDetailPanel({
   const isNeptune = focusedPlanet.name === "Neptune";
   const isSaturn = focusedPlanet.name === "Saturn";
   const isUranus = focusedPlanet.name === "Uranus";
+  const isSocialSignals = focusedPlanet.module === "social-signals";
   const panelTitle = isNeptune ? "Neptune" : focusedPlanet.name.toUpperCase();
   const panelDescription = isNeptune
     ? "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex."
@@ -61,6 +67,8 @@ export function NodeDetailPanel({
       ? "Global macro intelligence radar. Sweep tier-1 media feeds daily and surface 5–10 structurally significant headlines for cross-border policy and business."
       : isUranus
         ? "Structured macro intelligence database. Read extracted source signals, policy intent, capital impact, evidence, confidence, and source links."
+        : isSocialSignals
+          ? "X social signal board. Watch real-time public discourse for weak signals across macro, policy, society, trade, finance, investment, history, and geopolitics."
       : focusedPlanet.description;
 
   return (
@@ -160,7 +168,16 @@ export function NodeDetailPanel({
           </CyberButton>
         )}
 
-        {focusedPlanet.label && !isNeptune && !isUranus && (
+        {isSocialSignals && (
+          <CyberButton
+            className="mb-3 w-full"
+            onClick={handleEnterSystem}
+          >
+            Open Signal Boards
+          </CyberButton>
+        )}
+
+        {focusedPlanet.label && !isNeptune && !isUranus && !isSocialSignals && (
           <CyberButton
             className="mb-3 w-full"
             onClick={handleEnterSystem}

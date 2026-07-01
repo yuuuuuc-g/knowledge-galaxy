@@ -458,6 +458,140 @@ export type Database = {
           },
         ]
       }
+      x_signal_items: {
+        Row: {
+          actor_type: string
+          author_display_name: string | null
+          author_id: string | null
+          author_username: string | null
+          body: string
+          capture_method: string
+          captured_at: string
+          confidence: string
+          created_at: string
+          domains: string[]
+          engagement_score: number
+          external_id: string
+          id: string
+          language: string | null
+          media_urls: string[]
+          processing_state: string
+          published_at: string | null
+          raw_payload: Json
+          region_scope: string
+          signal_type: string
+          source_type: string
+          stance: string
+          time_horizon: string
+          title: string
+          topic_tags: string[]
+          updated_at: string
+          urgency: string
+          url: string
+          watch_rule_id: string | null
+        }
+        Insert: {
+          actor_type: string
+          author_display_name?: string | null
+          author_id?: string | null
+          author_username?: string | null
+          body?: string
+          capture_method: string
+          captured_at?: string
+          confidence: string
+          created_at?: string
+          domains?: string[]
+          engagement_score?: number
+          external_id: string
+          id?: string
+          language?: string | null
+          media_urls?: string[]
+          processing_state: string
+          published_at?: string | null
+          raw_payload?: Json
+          region_scope: string
+          signal_type: string
+          source_type: string
+          stance: string
+          time_horizon: string
+          title: string
+          topic_tags?: string[]
+          updated_at?: string
+          urgency: string
+          url: string
+          watch_rule_id?: string | null
+        }
+        Update: {
+          actor_type?: string
+          author_display_name?: string | null
+          author_id?: string | null
+          author_username?: string | null
+          body?: string
+          capture_method?: string
+          captured_at?: string
+          confidence?: string
+          created_at?: string
+          domains?: string[]
+          engagement_score?: number
+          external_id?: string
+          id?: string
+          language?: string | null
+          media_urls?: string[]
+          processing_state?: string
+          published_at?: string | null
+          raw_payload?: Json
+          region_scope?: string
+          signal_type?: string
+          source_type?: string
+          stance?: string
+          time_horizon?: string
+          title?: string
+          topic_tags?: string[]
+          updated_at?: string
+          urgency?: string
+          url?: string
+          watch_rule_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "x_signal_items_watch_rule_id_fkey"
+            columns: ["watch_rule_id"]
+            isOneToOne: false
+            referencedRelation: "x_watch_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      x_watch_rules: {
+        Row: {
+          created_at: string
+          domains: string[]
+          enabled: boolean
+          id: string
+          label: string
+          query: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domains?: string[]
+          enabled?: boolean
+          id: string
+          label: string
+          query: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domains?: string[]
+          enabled?: boolean
+          id?: string
+          label?: string
+          query?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       topics: {
         Row: {
           created_at: string | null

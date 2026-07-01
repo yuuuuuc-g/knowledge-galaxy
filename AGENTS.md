@@ -58,3 +58,17 @@ You MUST read and adhere to the skills installed in the `.agents` directory befo
 
 5. **Communication**
    - Use **`/caveman`**: To reduce token usage and drop filler, communicate with the user in ultra-compressed mode while retaining full technical accuracy.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default five-label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo with one root `CONTEXT.md` and root ADRs. See `docs/agents/domain.md`.

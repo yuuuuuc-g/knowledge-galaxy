@@ -3,14 +3,16 @@ export type ModuleType =
   | "analytical-pipeline"
   | "knowledge-graph"
   | "exocortex"
-  | "macro-intel";
+  | "macro-intel"
+  | "social-signals";
 
 export type PlanetLabel =
   | "Archive"
   | "Analytical Pipeline"
   | "Knowledge Graph"
   | "Exocortex"
-  | "Intelligence Board";
+  | "Intelligence Board"
+  | "Social Signals";
 
 export interface PlanetConfig {
   name: string;

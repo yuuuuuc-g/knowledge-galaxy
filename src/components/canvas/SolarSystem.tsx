@@ -26,11 +26,14 @@ export const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.6,
     rotationSpeed: 0.3,
     color: "#e6c288",
+    label: "Social Signals",
+    module: "social-signals",
     textureUrl: "/textures/2k_venus_atmosphere.jpg",
     type: "Terrestrial Planet",
     gravity: "8.87 m/s²",
     mass: "4.87 × 10²⁴ kg",
-    description: "Often called Earth's sister planet, Venus has a thick, toxic atmosphere that traps heat in a runaway greenhouse effect, making it the hottest planet in our system."
+    description:
+      "A real-time public-discourse sensorium for X posts, threads, media, trends, news, and Spaces about China macro, policy, society, trade, finance, investment, history, and geopolitics."
   },
   {
     name: "Earth",

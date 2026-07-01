@@ -15,6 +15,7 @@ import { GalaxyTerminalHUD } from "@/src/components/hud/GalaxyTerminalHUD";
 import { SunConsole } from "@/src/components/hud/SunConsole";
 import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
 import { MacroIntelConsole } from "@/src/components/hud/MacroIntelConsole";
+import { SocialSignalConsole } from "@/src/components/hud/SocialSignalConsole";
 import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
 import { useSolarStore } from "@/src/store/solarStore";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
@@ -30,10 +31,11 @@ type ActiveSystem =
   | "exocortex"
   | "saturn"
   | "macro-intel"
+  | "social-signals"
   | null;
 
 const SYSTEM_FRAMES: Record<
-  Exclude<ActiveSystem, "archive" | "saturn" | "macro-intel" | null>,
+  Exclude<ActiveSystem, "archive" | "saturn" | "macro-intel" | "social-signals" | null>,
   { eyebrow: string; title: string; src: string }
 > = {
   "analytical-pipeline": {
@@ -75,7 +77,8 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick, runtime }: SceneProp
   useDevRenderCounter("Home::MemoizedScene");
   return (
     <Canvas
-      className="z-0"
+      className="absolute inset-0 z-0 h-full w-full"
+      style={{ height: "100%", inset: 0, position: "absolute", width: "100%" }}
       camera={{ position: [0, 8, 40], fov: 45 }}
       dpr={runtime.dpr}
       frameloop={runtime.frameloop}
@@ -185,13 +188,14 @@ export default function Home() {
   useEffect(() => {
     if (
       ((activeSystem === "saturn" && focusedPlanet?.name !== "Saturn") ||
-        (activeSystem === "macro-intel" && focusedPlanet?.name !== "Uranus"))
+        (activeSystem === "macro-intel" && focusedPlanet?.name !== "Uranus") ||
+        (activeSystem === "social-signals" && focusedPlanet?.module !== "social-signals"))
     ) {
       const timer = window.setTimeout(() => setActiveSystem(null), 0);
       return () => window.clearTimeout(timer);
     }
     return undefined;
-  }, [activeSystem, focusedPlanet?.name]);
+  }, [activeSystem, focusedPlanet?.module, focusedPlanet?.name]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -295,6 +299,7 @@ export default function Home() {
           onEnterKnowledgeGraph={() => setActiveSystem("knowledge-graph")}
           onEnterExocortex={() => setActiveSystem("exocortex")}
           onEnterMacroIntel={() => setActiveSystem("macro-intel")}
+          onEnterSocialSignals={() => setActiveSystem("social-signals")}
           onOpenSaturnRadar={() => setActiveSystem("saturn")}
           isRAGOpen={activeSystem === "exocortex"}
         />
@@ -320,10 +325,16 @@ export default function Home() {
         onClose={() => setActiveSystem(null)}
       />
 
+      <SocialSignalConsole
+        isOpen={activeSystem === "social-signals"}
+        onClose={() => setActiveSystem(null)}
+      />
+
       {activeSystem &&
         activeSystem !== "archive" &&
         activeSystem !== "saturn" &&
-        activeSystem !== "macro-intel" && (
+        activeSystem !== "macro-intel" &&
+        activeSystem !== "social-signals" && (
           <SystemFrameConsole
             isOpen
             onClose={() => setActiveSystem(null)}

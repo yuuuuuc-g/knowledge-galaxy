@@ -79,6 +79,7 @@ describe("SunConsole", () => {
 
     expect(container.textContent).toContain("Module Placeholder");
     expect(container.textContent).toContain("Intelligence Board");
+    expect(container.textContent).toContain("Social Signals");
     expect(container.textContent).toContain("STANDBY");
     expect(container.textContent).toContain("ONLINE");
   });

@@ -40,6 +40,22 @@ An external RSS/news feed registered once and shared by intelligence Modules.
 **Source Strategy**:
 A Module-specific filtering, scoring, selection, or extraction rule applied to shared Intelligence Sources.
 
+**Social Signal**:
+A real-time public-discussion artifact captured from a social platform because it may reveal sentiment, attention, narrative change, or weak signals.
+_Avoid_: authoritative source, verified fact
+
+**Signal Item**:
+A single normalized Social Signal stored in the shared signal repository.
+_Avoid_: post-only record
+
+**Watch Rule**:
+A saved query, account target, or topic instruction used to capture Social Signals.
+_Avoid_: scraper config
+
+**Signal Board**:
+A Module view that filters Signal Items into a decision-oriented dashboard.
+_Avoid_: report page
+
 ## Relationships
 
 - A **Planet** provides access to exactly one **Module**
@@ -51,6 +67,8 @@ A Module-specific filtering, scoring, selection, or extraction rule applied to s
 - A **Generation** is grounded in one **Retrieval**
 - Multiple **Modules** can share the same **Intelligence Source**
 - A **Source Strategy** belongs to exactly one **Module**
+- A **Watch Rule** can produce multiple **Signal Items**
+- A **Signal Board** presents a filtered set of **Signal Items**
 
 ## Example dialogue
 
